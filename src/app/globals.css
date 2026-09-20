@@ -1,0 +1,137 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---- Bảng màu sáng (mặc định) ---- */
+:root {
+  --c-page: 255 246 240;
+  --c-card: 255 255 255;
+  --c-sand: 253 237 227;
+  --c-brand: 249 123 61;
+  --c-brand-deep: 217 94 34;
+  --c-lilac: 167 139 245;
+  --c-lilac-soft: 243 237 255;
+  --c-rose: 239 107 94;
+  --c-ink: 43 35 32;
+  --c-muted: 154 138 130;
+  --c-line: 244 226 214;
+
+  --g1: #ffe9dc;
+  --g2: #ffe2e8;
+  --g3: #f1e9ff;
+  --shadow-card: 0 2px 14px rgba(180, 120, 80, 0.07);
+  --shadow-lift: 0 6px 22px rgba(180, 120, 80, 0.13);
+  color-scheme: light;
+}
+
+/* ---- Bảng màu tối ---- */
+
+:root[data-theme='dark'] {
+  --c-page: 28 22 20;
+  --c-card: 37 30 26;
+  --c-sand: 45 36 31;
+  --c-brand: 255 139 79;
+  --c-brand-deep: 255 166 110;
+  --c-lilac: 185 162 255;
+  --c-lilac-soft: 44 37 62;
+  --c-rose: 245 128 112;
+  --c-ink: 242 233 227;
+  --c-muted: 162 147 139;
+  --c-line: 58 48 42;
+
+  --g1: #2a1f19;
+  --g2: #2b1c20;
+  --g3: #221f30;
+  --shadow-card: 0 2px 14px rgba(0, 0, 0, 0.3);
+  --shadow-lift: 0 6px 22px rgba(0, 0, 0, 0.42);
+  color-scheme: dark;
+}
+
+/* Chưa chọn thủ công thì theo cài đặt của máy */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --c-page: 28 22 20;
+    --c-card: 37 30 26;
+    --c-sand: 45 36 31;
+    --c-brand: 255 139 79;
+    --c-brand-deep: 255 166 110;
+    --c-lilac: 185 162 255;
+    --c-lilac-soft: 44 37 62;
+    --c-rose: 245 128 112;
+    --c-ink: 242 233 227;
+    --c-muted: 162 147 139;
+    --c-line: 58 48 42;
+
+    --g1: #2a1f19;
+    --g2: #2b1c20;
+    --g3: #221f30;
+    --shadow-card: 0 2px 14px rgba(0, 0, 0, 0.3);
+    --shadow-lift: 0 6px 22px rgba(0, 0, 0, 0.42);
+    color-scheme: dark;
+  }
+}
+
+html,
+body {
+  height: 100%;
+  color: rgb(var(--c-ink));
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background: rgb(var(--c-page));
+  background-image:
+    radial-gradient(120% 60% at 15% 0%, var(--g1) 0%, transparent 60%),
+    radial-gradient(100% 55% at 100% 8%, var(--g2) 0%, transparent 55%),
+    radial-gradient(120% 70% at 50% 100%, var(--g3) 0%, transparent 62%);
+  background-attachment: fixed;
+  overscroll-behavior-y: none;
+  transition: background-color 0.2s ease;
+}
+
+*:focus-visible {
+  outline: 2px solid rgb(var(--c-brand));
+  outline-offset: 2px;
+}
+
+textarea,
+input {
+  font-size: 16px; /* chặn iOS tự zoom khi focus */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.reveal {
+  animation: reveal 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.pop {
+  animation: pop 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
