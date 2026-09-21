@@ -74,6 +74,18 @@ Sau khi có domain, quay lại Supabase thêm `https://<domain>/auth/callback` v
 
 Mở domain bằng Safari (iOS) hoặc Chrome (Android) → Chia sẻ → Thêm vào màn hình chính. Mở từ icon sẽ không còn thanh địa chỉ.
 
+## Dùng chung project Supabase với app khác
+
+Gói miễn phí của Supabase giới hạn số project, nên nhiều người đặt nhiều app vào chung một project. Làm vậy được, nhưng cần biết ba điều.
+
+**Các app dùng chung danh sách tài khoản.** Cùng một email và mật khẩu đăng nhập được mọi app trong project. Ai tạo tài khoản ở app nào cũng tự có một dòng hồ sơ trong bảng `profiles` của Verso.
+
+**Tên dễ đụng nhau.** `schema.sql` dùng những tên rất phổ biến: bảng `profiles`, hàm `handle_new_user`, trigger `on_auth_user_created`. Nếu app khác đã dùng các tên đó, chạy `schema.sql` sẽ ghi đè mà không báo gì.
+
+**Project đã có Verso thì đừng chạy lại `schema.sql`.** Chỉ chạy các file `MIGRATION-v*.sql` theo đúng thứ tự phiên bản. Mọi file migration đều chỉ thêm chứ không xoá, và chạy lại nhiều lần vẫn an toàn.
+
+Bảng `profiles` có sẵn hai cột `email` và `updated_at` cho những app khác hay đồng bộ email vào đây.
+
 ## Cách dùng
 
 1. **Nạp tài liệu** — Thư viện → Nạp tài liệu. Chụp bản tiếng Anh gốc và bản dịch tiếng Việt của cùng nội dung. Claude đọc chữ, tách câu, ghép cặp và gắn độ khó. Bạn duyệt lại rồi lưu.

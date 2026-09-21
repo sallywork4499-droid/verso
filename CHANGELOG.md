@@ -1,5 +1,23 @@
 # Nhật ký phiên bản
 
+## v2.6 — Sửa xung đột khi dùng chung project Supabase
+
+**Lỗi.** Project Supabase này dùng chung cho nhiều app. Một app khác có hàm `fn_sync_user_email`, chạy mỗi khi ai đó đổi email, ghi vào bảng `profiles` hai cột `email` và `updated_at`. Bảng `profiles` là của Verso và không có hai cột đó. Hàm lỗi, và vì chạy như một trigger trên bảng tài khoản nên nó kéo theo cả thao tác đổi email bị huỷ — ở mọi app trong project, không riêng Verso.
+
+Nguyên nhân gốc là `schema.sql` viết theo giả định Verso có database riêng, nên dùng những tên rất phổ biến mà không lường trước chuyện đụng hàng.
+
+**Sửa.** Thêm hai cột `email` và `updated_at` vào `profiles`, điền email cho các hồ sơ đã có, và cho hàm tạo người dùng điền luôn email lúc đăng ký. Không xoá, không đổi tên gì, nên app nào đang dựa vào `profiles` vẫn chạy như cũ.
+
+**Đã kiểm tra trên Postgres thật.** Dựng lại đúng tình trạng database hiện tại — danh sách cột khớp y hệt ảnh chụp — rồi xác nhận: trước khi sửa, đổi email báo lỗi `column "email" does not exist`; sau khi sửa thì chạy được; chạy file sửa lần hai không lỗi; tài khoản mới tự có email; và `schema.sql` mới dựng được từ đầu ở cả project trống lẫn project đã có app khác.
+
+**`schema.sql` có cảnh báo ở đầu file** về chuyện dùng chung project, và README có mục riêng giải thích.
+
+**File `TEST-doi-email.sql`** để tự kiểm tra sau khi sửa. Nó tạm đổi email một tài khoản, xem hàm đồng bộ có chạy không, rồi huỷ toàn bộ. Đã thử cả khi lỗi giữa chừng: email thật vẫn nguyên.
+
+### Cần làm khi cập nhật
+
+Chạy `MIGRATION-v2.6.sql` trong Supabase SQL Editor. Ba dòng kiểm tra ở cuối phải ra CÓ. Rồi chạy `TEST-doi-email.sql`, thấy dòng ĐÃ CHẠY ĐƯỢC là xong.
+
 ## v2.5 — Chuyển tab nhanh hơn
 
 Chuyển giữa các tab mất 2-3 giây. Nguyên nhân chính không nằm ở code mà ở nơi đặt server.

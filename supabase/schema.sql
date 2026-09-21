@@ -1,6 +1,14 @@
 -- ============================================================
 -- Verso - Schema Supabase
 -- Chạy toàn bộ file này trong SQL Editor của Supabase project.
+--
+-- CẢNH BÁO KHI DÙNG CHUNG PROJECT VỚI APP KHÁC
+-- File này dùng những tên rất phổ biến: bảng profiles, hàm handle_new_user,
+-- trigger on_auth_user_created. Nếu project đã có app khác dùng các tên đó,
+-- chạy file này sẽ GHI ĐÈ hàm và trigger của app kia mà không báo gì.
+--
+-- Project đã có sẵn Verso: đừng chạy lại file này.
+-- Chỉ chạy các file MIGRATION-v*.sql theo đúng thứ tự phiên bản.
 -- ============================================================
 
 -- 1. HỒ SƠ NGƯỜI DÙNG -----------------------------------------
@@ -13,6 +21,10 @@ create table if not exists profiles (
   preferred_difficulty text not null default 'sentence'
     check (preferred_difficulty in ('phrase','sentence','paragraph')),
   timezone text not null default 'Asia/Ho_Chi_Minh',
+  daily_goal int not null default 10 check (daily_goal between 1 and 200),
+  -- Hai cột dưới dành cho các app khác trong cùng project hay đồng bộ email vào đây
+  email text,
+  updated_at timestamptz default now(),
   created_at timestamptz not null default now()
 );
 
@@ -23,7 +35,9 @@ language plpgsql
 security definer set search_path = public
 as $$
 begin
-  insert into profiles (id) values (new.id) on conflict do nothing;
+  insert into profiles (id, email)
+  values (new.id, new.email)
+  on conflict (id) do update set email = excluded.email;
   return new;
 end;
 $$;
@@ -219,11 +233,3 @@ create policy "own files write" on storage.objects
 drop policy if exists "own files delete" on storage.objects;
 create policy "own files delete" on storage.objects
   for delete using (bucket_id = 'docs' and auth.uid()::text = (storage.foldername(name))[1]);
-
--- ============================================================
--- v2.4: mục tiêu số câu mỗi ngày
--- Chạy riêng phần này nếu database đã dựng từ bản trước.
--- ============================================================
-alter table profiles
-  add column if not exists daily_goal int not null default 10
-  check (daily_goal between 1 and 200);
