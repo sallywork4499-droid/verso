@@ -2,9 +2,25 @@ import { parseJson, type AskOptions, type Provider } from './types';
 
 const ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
 
-/** Model không tồn tại hay không có quyền thì thử cái kế tiếp. */
+/** Model không tồn tại, không có quyền, hay đang quá tải thì thử cái kế tiếp. */
 function shouldTryNext(status: number) {
-  return status === 404 || status === 403 || status === 400;
+  return status === 404 || status === 403 || status === 400 || isOverloaded(status);
+}
+
+/** Lỗi phía Google, thường chỉ tạm thời: model đang quá tải hay trục trặc. */
+function isOverloaded(status: number) {
+  return status === 500 || status === 502 || status === 503 || status === 504;
+}
+
+/** Rút câu thông báo ra khỏi khối JSON lỗi của Google, cho người đọc được. */
+function readableMessage(body: string): string {
+  try {
+    const msg = JSON.parse(body)?.error?.message;
+    if (typeof msg === 'string' && msg) return msg.slice(0, 200);
+  } catch {
+    /* không phải JSON thì dùng nguyên văn */
+  }
+  return body.slice(0, 200);
 }
 
 /**
@@ -32,6 +48,7 @@ export function gemini(apiKey: string, models: string[]): Provider {
 
       const tried: string[] = [];
       let lastError = '';
+      let lastStatus = 0;
 
       for (const model of order) {
         const res = await fetch(`${ENDPOINT}/${model}:generateContent`, {
@@ -93,11 +110,16 @@ export function gemini(apiKey: string, models: string[]): Provider {
           );
         }
         if (!shouldTryNext(res.status)) {
-          throw new Error(`Gemini lỗi ${res.status}: ${body.slice(0, 300)}`);
+          throw new Error(`Gemini lỗi ${res.status}: ${readableMessage(body)}`);
         }
-        lastError = `${res.status}: ${body.slice(0, 200)}`;
+        lastStatus = res.status;
+        lastError = `${res.status}: ${readableMessage(body)}`;
       }
 
+      // Mọi model đều quá tải: nói cho dễ hiểu thay vì đổ nguyên JSON ra màn hình
+      if (isOverloaded(lastStatus)) {
+        throw new Error('Gemini đang quá tải, thường tự hết sau vài phút. Bấm Chấm lại để thử lần nữa.');
+      }
       throw new Error(
         `Không model nào dùng được. Đã thử: ${tried.join(', ')}. Lỗi cuối — ${lastError}`
       );

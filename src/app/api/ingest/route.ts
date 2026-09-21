@@ -154,7 +154,7 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({
-      title: parsed.title || firstWords(textVi ?? '') || 'Trang bài mới',
+      title: parsed.title || firstWords(textVi ?? '') || 'Đoạn mới',
       provider: provider.name,
       pairs: await markDuplicates(supabase, user.id, pairs),
     });

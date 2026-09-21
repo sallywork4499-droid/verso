@@ -29,6 +29,7 @@ export type Profile = {
   preferred_difficulty: Difficulty;
   timezone: string;
   daily_goal: number;
+  focus_levels: Difficulty[] | null;
 };
 
 export type Feedback = {

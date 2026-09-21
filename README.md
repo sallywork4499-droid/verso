@@ -88,6 +88,7 @@ Bảng `profiles` có sẵn hai cột `email` và `updated_at` cho những app k
 
 ## Cách dùng
 
+0. **Mỗi lần nạp là một đoạn.** Nút 📖 trên màn hình luyện để chọn luyện đoạn nào, một hay nhiều đoạn cùng lúc. Ba nút Cụm từ, Câu, Đoạn bên dưới bật tắt tự do.
 1. **Nạp tài liệu** — Thư viện → Nạp tài liệu. Chụp bản tiếng Anh gốc và bản dịch tiếng Việt của cùng nội dung. Claude đọc chữ, tách câu, ghép cặp và gắn độ khó. Bạn duyệt lại rồi lưu.
 2. **Luyện** — mở app là có câu tiếng Việt. Gõ bản tiếng Anh, nhấn Kiểm tra. Bản gốc hiện ra ngay để tự đối chiếu; nhận xét chi tiết của Claude trượt vào sau vài giây, không phải chờ.
 3. **Tự phán** — Đúng rồi hoặc Chưa đúng. Câu bị đánh sai quay lại sau vài câu khác, lặp cho đến khi dịch đúng.

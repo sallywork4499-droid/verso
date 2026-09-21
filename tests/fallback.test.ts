@@ -78,6 +78,46 @@ async function main() {
   check('Khoá sai thì dừng ngay', called.length === 1, `gọi ${called.length} lần`);
   check('Hướng dẫn tạo khoá mới', msg.includes('aistudio.google.com'));
 
+  console.log('\n── Model quá tải thì thử model khác ──');
+
+  // Model đầu báo 503, model sau rảnh
+  called.length = 0;
+  global.fetch = (async (url: string) => {
+    const model = String(url).split('/models/')[1].split(':')[0];
+    called.push(model);
+    if (model === 'ranh') {
+      return { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: '{"ok":true}' }] } }] }) };
+    }
+    return {
+      ok: false,
+      status: 503,
+      text: async () => JSON.stringify({ error: { code: 503, message: 'This model is currently experiencing high demand.' } }),
+    };
+  }) as unknown as typeof fetch;
+  const r503 = await ask(['qua-tai', 'ranh']);
+  check('Model đầu quá tải thì chuyển sang model sau', r503.ok === true, called.join(','));
+
+  // Mọi model đều quá tải
+  fakeServer([], 503);
+  msg = '';
+  try {
+    await ask(['q1', 'q2', 'q3']);
+  } catch (e) {
+    msg = e instanceof Error ? e.message : '';
+  }
+  check('Thử hết cả danh sách trước khi bỏ cuộc', called.length === 3, `gọi ${called.length} lần`);
+  check('Báo quá tải bằng câu dễ hiểu', msg.includes('quá tải'), msg.slice(0, 60));
+  check('Không đổ nguyên JSON ra màn hình', !msg.includes('{'), msg.slice(0, 60));
+
+  fakeServer([], 500);
+  msg = '';
+  try {
+    await ask(['a', 'b']);
+  } catch (e) {
+    msg = e instanceof Error ? e.message : '';
+  }
+  check('Lỗi 500 cũng được coi là tạm thời', called.length === 2 && msg.includes('quá tải'));
+
   console.log('\n── Nhớ model đã chạy được ──');
 
   fakeServer(['c']);

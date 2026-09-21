@@ -2,7 +2,7 @@
  * Logic hàng đợi của một phiên luyện, tách riêng để test được.
  * Không phụ thuộc React, không gọi mạng.
  */
-import type { Card } from './types';
+import type { Card, Difficulty } from './types';
 
 /** Câu sai quay lại sau chừng này câu khác. */
 export const REINSERT_GAP = 3;
@@ -51,4 +51,70 @@ export function lastDays(count: number, timezone: string, from = new Date()): st
     out.push(dateKey(d, timezone));
   }
   return out;
+}
+
+/* ============================================================
+ * Học theo đoạn: chọn nhiều đoạn và nhiều mức cùng lúc
+ * ============================================================ */
+
+export const ALL_LEVELS: Difficulty[] = ['phrase', 'sentence', 'paragraph'];
+
+/** Chuẩn hoá danh sách mức: đúng thứ tự, không trùng, rỗng thì lấy cả ba. */
+export function normalizeLevels(levels: readonly string[] | null | undefined): Difficulty[] {
+  const set = new Set(levels ?? []);
+  const out = ALL_LEVELS.filter((l) => set.has(l));
+  return out.length ? out : [...ALL_LEVELS];
+}
+
+/**
+ * Chữ ký của một lựa chọn học. Đổi đoạn hay đổi mức là chữ ký đổi,
+ * và mọi thứ gắn với lựa chọn cũ (hàng đợi, tiến độ) bị bỏ đi.
+ * Thứ tự chọn không quan trọng: chọn A rồi B cũng như chọn B rồi A.
+ */
+export function selectionKey(pageIds: readonly string[], levels: readonly Difficulty[]): string {
+  return [...pageIds].sort().join(',') + '|' + normalizeLevels(levels).join(',');
+}
+
+/** Tiến độ của lựa chọn hiện tại: đã dịch đúng bao nhiêu trên tổng số. */
+export function progressOf(doneIds: ReadonlySet<string>, total: number) {
+  const done = Math.min(doneIds.size, total);
+  return {
+    done,
+    total,
+    pct: total > 0 ? Math.round((done / total) * 100) : 0,
+    finished: total > 0 && done >= total,
+  };
+}
+
+/** Tên hiện trên nút chọn đoạn: một đoạn thì hiện tên, nhiều đoạn thì đếm. */
+export function selectionLabel(
+  selected: readonly { title: string }[],
+  totalPages: number
+): string {
+  if (selected.length === 0) return 'Chọn đoạn';
+  if (selected.length === totalPages && totalPages > 1) return `Tất cả ${totalPages} đoạn`;
+  if (selected.length === 1) return selected[0].title;
+  return `${selected.length} đoạn`;
+}
+
+/**
+ * Chọn câu cho lượt tới từ toàn bộ câu của lựa chọn.
+ * Bỏ những câu đã đúng hoặc đang nằm trong hàng đợi, ưu tiên câu tới hạn ôn,
+ * rồi tới câu ít gặp nhất. Không ép thứ tự cụm từ trước câu sau.
+ */
+export function pickBatch(
+  cards: readonly Card[],
+  exclude: ReadonlySet<string>,
+  size: number,
+  now: Date = new Date()
+): Card[] {
+  const t = now.getTime();
+  const pool = cards.filter((c) => !exclude.has(c.id));
+  const due = pool
+    .filter((c) => new Date(c.next_due_at).getTime() <= t)
+    .sort((a, b) => new Date(a.next_due_at).getTime() - new Date(b.next_due_at).getTime());
+  const rest = pool
+    .filter((c) => new Date(c.next_due_at).getTime() > t)
+    .sort((a, b) => a.times_seen - b.times_seen);
+  return [...due, ...rest].slice(0, size);
 }

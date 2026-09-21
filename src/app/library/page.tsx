@@ -38,7 +38,7 @@ export default async function Library() {
 
       <h1 className="font-study text-3xl text-ink">Thư viện</h1>
       <p className="mt-2 text-sm leading-relaxed text-muted">
-        App chỉ bốc câu từ những trang bài đang bật. Tắt một trang là tạm cất nó đi, không mất dữ liệu.
+        Tick là đang luyện. Chọn nhanh hơn ở nút 📖 trên màn hình luyện. Bỏ tick chỉ là tạm cất, không mất dữ liệu.
       </p>
 
       <div className="mt-8">

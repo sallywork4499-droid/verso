@@ -1,5 +1,43 @@
 # Nhật ký phiên bản
 
+## v2.8 — Học theo đoạn
+
+**Vấn đề.** App bốc ngẫu nhiên từ mọi đoạn đang bật, lọc theo một mức duy nhất. Cụm từ của đoạn A có thể đứng ngay trước một câu của đoạn B. Với người học theo từng đoạn thì chuyện lộn xộn này là tất nhiên.
+
+**Mỗi lần nạp là một đoạn.** Cái trước đây gọi là "Trang bài" giờ gọi là "Đoạn", đúng với cách dùng thật. Không cần bảng mới: những đoạn đang luyện dùng lại cột `pages.is_default` có sẵn.
+
+**Chọn đoạn ngay trên màn hình luyện.** Nút 📖 ở đầu màn hình ghi tên đoạn đang luyện. Bấm vào mở hộp chọn: mỗi đoạn có nút "Chỉ đoạn này" để vào luyện bằng một lần bấm, hoặc tick nhiều đoạn rồi bấm Luyện để trộn. Chọn tất cả thì thành học tự do, không cần một chế độ riêng.
+
+**Chọn mức tự do, nhiều mức cùng lúc.** Ba nút Cụm từ, Câu, Đoạn bật tắt độc lập: chỉ Đoạn, chỉ Câu, Câu cộng Đoạn, hay cả ba. Không ép thứ tự cụm từ trước câu sau. Luôn còn ít nhất một mức được bật. App nhớ lựa chọn cho lần mở sau.
+
+**Đổi lựa chọn là xoá sạch hàng đợi cũ.** Đổi đoạn hay đổi mức thì app bỏ hết câu của lựa chọn cũ, kể cả câu sai đang chờ quay lại. Câu sai đó không mất: nó vẫn nằm trong lịch ôn và quay lại khi bạn luyện lại đoạn đó. Lời gọi mạng nào đang dở của lựa chọn cũ cũng bị bỏ khi về tới, để không lẫn vào.
+
+**Có đích đến.** Thanh tiến độ cạnh nút 📖 đếm số mục đã dịch đúng trên tổng số mục của lựa chọn. Xong hết thì con cáo chúc mừng, kèm nút "Sang đoạn tiếp" khi đang luyện một đoạn, "Chọn đoạn khác", và "Luyện lại từ đầu". Tiến độ được nhớ trong ngày, đóng app mở lại vẫn còn.
+
+**Nạp vào đoạn có sẵn.** Bước duyệt có ô "Lưu vào": tạo đoạn mới, hoặc gắn vào một đoạn đã có. Tab Danh sách từ mặc định gắn vào đoạn mới nhất, vì thường đó là đoạn vừa học xong với Thầy.
+
+**Luyện ngay sau khi nạp.** Ô "Luyện đoạn này ngay" tick sẵn: lưu xong là vào thẳng màn hình luyện với đúng đoạn vừa nạp.
+
+**Route bốc câu nhận POST.** Danh sách câu cần bỏ qua có thể dài vài trăm mã khi luyện nhiều đoạn, nhét lên URL sẽ vượt giới hạn. Logic chọn câu chuyển thành hàm thuần `pickBatch` trong `src/lib/session.ts`, có test riêng.
+
+**Tách màn hình luyện.** Các khối phụ chuyển sang `PracticeParts.tsx`, file chính chỉ còn phần điều khiển vòng lặp.
+
+### Cần làm khi cập nhật
+
+Chạy `MIGRATION-v2.8.sql` trong Supabase SQL Editor, dòng kiểm tra phải ra CÓ.
+
+## v2.7 — Chịu được lúc Gemini quá tải
+
+**Lỗi.** Khi một model Gemini báo quá tải (mã 503), app bỏ cuộc ngay thay vì thử model khác trong danh sách, rồi đổ nguyên khối JSON lỗi lên màn hình. Cơ chế thử nhiều model ở v2.0 chỉ tính trường hợp model không tồn tại, chưa tính trường hợp model tồn tại mà đang bận.
+
+**Quá tải thì chuyển sang model khác.** Lỗi 500, 502, 503, 504 giờ được coi là lỗi tạm thời phía Google, nên app thử model kế tiếp. Model khác trong danh sách thường đang rảnh.
+
+**Thông báo đọc được.** Mọi model đều quá tải thì báo một câu tiếng Việt ngắn thay vì JSON. Các lỗi khác cũng được rút lấy đúng câu thông báo bên trong.
+
+**Nút Chấm lại** ngay trong khung báo lỗi, bấm là gửi chấm lần nữa mà không phải dịch lại câu.
+
+Lỗi hết hạn mức (429) và khoá sai (401) vẫn dừng ngay như cũ, vì thử model khác cũng không giúp gì mà chỉ làm hạn mức cạn nhanh hơn.
+
 ## v2.6 — Sửa xung đột khi dùng chung project Supabase
 
 **Lỗi.** Project Supabase này dùng chung cho nhiều app. Một app khác có hàm `fn_sync_user_email`, chạy mỗi khi ai đó đổi email, ghi vào bảng `profiles` hai cột `email` và `updated_at`. Bảng `profiles` là của Verso và không có hai cột đó. Hàm lỗi, và vì chạy như một trigger trên bảng tài khoản nên nó kéo theo cả thao tác đổi email bị huỷ — ở mọi app trong project, không riêng Verso.

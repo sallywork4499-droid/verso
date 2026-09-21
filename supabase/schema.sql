@@ -22,6 +22,8 @@ create table if not exists profiles (
     check (preferred_difficulty in ('phrase','sentence','paragraph')),
   timezone text not null default 'Asia/Ho_Chi_Minh',
   daily_goal int not null default 10 check (daily_goal between 1 and 200),
+  -- Những mức đang luyện; đoạn đang luyện thì nằm ở pages.is_default
+  focus_levels text[] not null default array['phrase', 'sentence', 'paragraph'],
   -- Hai cột dưới dành cho các app khác trong cùng project hay đồng bộ email vào đây
   email text,
   updated_at timestamptz default now(),

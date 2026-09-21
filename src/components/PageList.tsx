@@ -23,7 +23,7 @@ export default function PageList({ pages }: { pages: Page[] }) {
   }
 
   async function removePage(page: Page) {
-    if (!confirm(`Xoá trang bài "${page.title}" và toàn bộ câu trong đó?`)) return;
+    if (!confirm(`Xoá đoạn "${page.title}" và toàn bộ mục trong đó?`)) return;
     setList((l) => l.filter((p) => p.id !== page.id));
     await supabase.from('pages').delete().eq('id', page.id);
     router.refresh();
@@ -46,12 +46,12 @@ export default function PageList({ pages }: { pages: Page[] }) {
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Tìm trang bài…"
+          placeholder="Tìm đoạn…"
           className="mb-4 w-full rounded-2xl bg-card px-4 py-3 shadow-card placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-brand/60"
         />
       )}
       {shown.length === 0 && (
-        <p className="leading-relaxed text-muted">Không có trang bài nào khớp.</p>
+        <p className="leading-relaxed text-muted">Không có đoạn nào khớp.</p>
       )}
     <ul className="space-y-3">
       {shown.map((page) => (
@@ -59,14 +59,14 @@ export default function PageList({ pages }: { pages: Page[] }) {
           <div className="flex items-center gap-3 p-4">
             <button
               onClick={() => toggleDefault(page)}
-              aria-label={page.is_default ? 'Tắt trang bài này' : 'Bật trang bài này'}
+              aria-label={page.is_default ? 'Thôi luyện đoạn này' : 'Luyện đoạn này'}
               className={`h-5 w-5 shrink-0 rounded border transition-colors ${
                 page.is_default ? 'border-brand bg-brand' : 'border-line'
               }`}
             />
             <button onClick={() => setOpen(open === page.id ? null : page.id)} className="flex-1 text-left">
               <p className={page.is_default ? 'text-ink' : 'text-muted'}>{page.title}</p>
-              <p className="mt-0.5 text-xs text-muted">{page.card_count} câu</p>
+              <p className="mt-0.5 text-xs text-muted">{page.card_count} mục</p>
             </button>
             <button onClick={() => removePage(page)} className="px-2 text-sm text-muted hover:text-rose">
               Xoá
@@ -133,7 +133,7 @@ function CardEditor({ pageId }: { pageId: string }) {
 
   return (
     <div className="space-y-3 border-t border-line p-4">
-      {cards.length === 0 && <p className="text-sm text-muted">Trang bài này chưa có câu nào.</p>}
+      {cards.length === 0 && <p className="text-sm text-muted">Đoạn này chưa có mục nào.</p>}
       {cards.map((card) => (
         <div key={card.id} className="rounded-xl bg-sand p-3">
           <div className="mb-2 flex items-center justify-between text-xs text-muted">

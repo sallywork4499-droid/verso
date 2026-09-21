@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
@@ -33,9 +33,21 @@ export default function Ingest() {
   const [txtVi, setTxtVi] = useState('');
   const [split, setSplit] = useState(true);
   const [title, setTitle] = useState('');
+  // Lưu vào đoạn mới hay gắn vào một đoạn đã có
+  const [target, setTarget] = useState<string>('new');
+  const [existing, setExisting] = useState<{ id: string; title: string; created_at: string }[]>([]);
+  const [practiceNow, setPracticeNow] = useState(true);
   const [rows, setRows] = useState<Row[]>([]);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    createClient()
+      .from('pages')
+      .select('id,title,created_at')
+      .order('created_at', { ascending: false })
+      .then(({ data }) => setExisting(data ?? []));
+  }, []);
 
   function pick(which: 'en' | 'vi') {
     return async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -74,6 +86,7 @@ export default function Ingest() {
       setTitle(`Danh sách ${pairs.length} ${noun}`);
       setRows(pairs.map((p) => ({ ...p, keep: true })));
       setUnparsed(left);
+      setTarget(existing[0]?.id ?? 'new');
       setStep('review');
       return;
     }
@@ -96,6 +109,7 @@ export default function Ingest() {
         return;
       }
       setTitle(data.title);
+      setTarget('new');
       setRows(data.pairs.map((p: Pair & { duplicate: boolean }) => ({ ...p, keep: !p.duplicate })));
       setStep('review');
     } catch {
@@ -112,22 +126,25 @@ export default function Ingest() {
     } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { data: page, error: pageErr } = await supabase
-      .from('pages')
-      .insert({ user_id: user.id, title: title || 'Trang bài mới' })
-      .select()
-      .single();
-
-    if (pageErr || !page) {
-      setError('Không lưu được trang bài');
-      setStep('review');
-      return;
+    let pageId = target;
+    if (target === 'new') {
+      const { data: page, error: pageErr } = await supabase
+        .from('pages')
+        .insert({ user_id: user.id, title: title.trim() || 'Đoạn mới' })
+        .select()
+        .single();
+      if (pageErr || !page) {
+        setError('Không tạo được đoạn mới');
+        setStep('review');
+        return;
+      }
+      pageId = page.id;
     }
 
     const keep = rows.filter((r) => r.keep);
     const { error: cardErr } = await supabase.from('cards').insert(
       keep.map((r) => ({
-        page_id: page.id,
+        page_id: pageId,
         user_id: user.id,
         vi_text: r.vi.trim(),
         en_text: r.en.trim(),
@@ -140,6 +157,15 @@ export default function Ingest() {
       setStep('review');
       return;
     }
+
+    // Luyện ngay: chỉ bật đúng đoạn này, tắt các đoạn khác cho khỏi lẫn
+    if (practiceNow) {
+      await Promise.all([
+        supabase.from('pages').update({ is_default: true }).eq('id', pageId),
+        supabase.from('pages').update({ is_default: false }).eq('user_id', user.id).neq('id', pageId),
+      ]);
+    }
+
     router.push('/');
     router.refresh();
   }
@@ -295,11 +321,37 @@ export default function Ingest() {
         Sửa chỗ nào lệch, bỏ chọn câu không cần. Câu trùng với thư viện đã được bỏ chọn sẵn.
       </p>
 
-      <input
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        className="mt-6 w-full rounded-2xl bg-card shadow-card px-4 py-3 text-ink focus:border-brand/60 focus:outline-none"
-      />
+      <div className="mt-6 rounded-2xl bg-card p-4 shadow-card">
+        <label className="text-xs font-semibold text-muted" htmlFor="target">
+          Lưu vào
+        </label>
+        <select
+          id="target"
+          value={target}
+          onChange={(e) => setTarget(e.target.value)}
+          className="mt-1.5 w-full rounded-xl bg-sand px-3 py-2.5 font-semibold focus:outline-none focus:ring-2 focus:ring-brand/60"
+        >
+          <option value="new">＋ Đoạn mới</option>
+          {existing.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.title}
+            </option>
+          ))}
+        </select>
+
+        {target === 'new' ? (
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Tên đoạn, ví dụ: Đô thị hoá – đoạn 2"
+            className="mt-2 w-full rounded-xl bg-sand px-3 py-2.5 placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-brand/60"
+          />
+        ) : (
+          <p className="mt-2 text-xs leading-relaxed text-muted">
+            Các mục dưới đây sẽ gắn vào đoạn đã chọn, cùng với những gì đoạn đó đang có.
+          </p>
+        )}
+      </div>
 
       <ul className="mt-4 space-y-3">
         {rows.map((row, i) => (
@@ -378,6 +430,22 @@ export default function Ingest() {
       )}
 
       {error && <p className="mt-4 text-sm text-rose">{error}</p>}
+
+      <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-2xl bg-card p-4 shadow-card">
+        <input
+          type="checkbox"
+          checked={practiceNow}
+          onChange={(e) => setPracticeNow(e.target.checked)}
+          className="mt-0.5 h-4 w-4 shrink-0 accent-brand"
+        />
+        <span className="text-sm font-semibold leading-relaxed">
+          Luyện đoạn này ngay
+          <span className="mt-0.5 block text-xs font-normal text-muted">
+            Lưu xong vào thẳng màn hình luyện, chỉ với đoạn này. Bỏ tick thì đoạn được thêm vào
+            những gì đang luyện.
+          </span>
+        </span>
+      </label>
 
       <div className="fixed inset-x-0 bottom-0 border-t border-line bg-page/95 p-4 backdrop-blur">
         <div className="mx-auto max-w-2xl">
