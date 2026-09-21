@@ -14,29 +14,28 @@ export default async function Home() {
   } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
-  let { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single();
+  // Hỏi song song: hồ sơ và nhật ký hôm nay không phụ thuộc nhau
+  const [{ data: found }, { data: logs }] = await Promise.all([
+    supabase.from('profiles').select('*').eq('id', user.id).single(),
+    supabase
+      .from('daily_logs')
+      .select('log_date,cards_completed')
+      .eq('user_id', user.id)
+      .order('log_date', { ascending: false })
+      .limit(2),
+  ]);
 
+  let profile = found;
   if (!profile) {
-    const { data } = await supabase
-      .from('profiles')
-      .insert({ id: user.id })
-      .select()
-      .single();
+    const { data } = await supabase.from('profiles').insert({ id: user.id }).select().single();
     profile = data;
   }
-
   const p = profile as Profile;
 
-  const { data: todayLog } = await supabase
-    .from('daily_logs')
-    .select('cards_completed')
-    .eq('user_id', user.id)
-    .eq('log_date', dateKey(new Date(), p.timezone))
-    .maybeSingle();
+  // Lấy hai ngày gần nhất rồi chọn đúng hôm nay theo múi giờ người dùng,
+  // khỏi phải đợi có hồ sơ mới biết hỏi ngày nào
+  const today = dateKey(new Date(), p.timezone);
+  const todayLog = (logs ?? []).find((l) => l.log_date === today);
 
   return (
     <>

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { DIFFICULTY_LABEL, badgeLabel } from '@/lib/scoring';
 import { afterCorrect, afterWrong, mergeQueue } from '@/lib/session';
 import { createClient } from '@/lib/supabase/client';
@@ -48,6 +49,9 @@ export default function Practice({
   const [fixEn, setFixEn] = useState('');
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const router = useRouter();
+  // Có câu vừa chấm thì trang Tiến độ đang giữ trong bộ nhớ đã cũ
+  const dirty = useRef(false);
   // Câu nào đã từng bị đánh sai trong phiên này — theo từng câu, không dùng chung một cờ
   const retried = useRef<Set<string>>(new Set());
   const card = queue[0] ?? null;
@@ -234,6 +238,7 @@ export default function Practice({
     }
 
     setCombo(nextCombo);
+    dirty.current = true;
     localStorage.removeItem(DRAFT_KEY);
 
     if (correct) {
@@ -272,6 +277,7 @@ export default function Practice({
     if (!vi || !en) return;
     setQueue((cur) => cur.map((c) => (c.id === card.id ? { ...c, vi_text: vi, en_text: en } : c)));
     setFixing(false);
+    dirty.current = true;
     await createClient().from('cards').update({ vi_text: vi, en_text: en }).eq('id', card.id);
   }
 
@@ -281,6 +287,7 @@ export default function Practice({
     if (!confirm('Xoá hẳn câu này khỏi thư viện?')) return;
     const id = card.id;
     setFixing(false);
+    dirty.current = true;
     advance(queue.filter((c) => c.id !== id));
     await createClient().from('cards').delete().eq('id', id);
   }
@@ -302,6 +309,13 @@ export default function Practice({
         done={doneThisSession}
         doneToday={doneToday}
         goal={profile.daily_goal}
+        onOpenDashboard={(e) => {
+          if (!dirty.current) return; // chưa đổi gì: dùng bản đang giữ, hiện ngay
+          e.preventDefault();
+          dirty.current = false;
+          router.refresh(); // xoá bản cũ trong bộ nhớ trước khi sang
+          router.push('/dashboard');
+        }}
       />
 
       <div className="flex gap-1 px-4 pb-3 pt-1">
@@ -406,6 +420,7 @@ function StatusBar({
   done,
   doneToday,
   goal,
+  onOpenDashboard,
 }: {
   streak: number;
   points: number;
@@ -413,6 +428,7 @@ function StatusBar({
   done: number;
   doneToday: number;
   goal: number;
+  onOpenDashboard: (e: React.MouseEvent<HTMLAnchorElement>) => void;
 }) {
   return (
     <header className="flex items-center justify-between px-4 pt-3 text-sm">
@@ -431,7 +447,7 @@ function StatusBar({
         <Link href="/library" className="hover:text-ink">
           Thư viện
         </Link>
-        <Link href="/dashboard" className="hover:text-ink">
+        <Link href="/dashboard" onClick={onOpenDashboard} className="hover:text-ink">
           Tiến độ
         </Link>
       </nav>

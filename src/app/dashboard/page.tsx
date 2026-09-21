@@ -17,7 +17,7 @@ export default async function Dashboard() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ data: profile }, { data: logs }, { data: badges }] = await Promise.all([
+  const [{ data: profile }, { data: logs }, { data: badges }, { data: weak }] = await Promise.all([
     supabase.from('profiles').select('*').eq('id', user!.id).single(),
     supabase
       .from('daily_logs')
@@ -26,16 +26,15 @@ export default async function Dashboard() {
       .order('log_date', { ascending: false })
       .limit(400),
     supabase.from('badges').select('badge_key').eq('user_id', user!.id),
+    // Câu hay sai nhất: đã gặp vài lần mà tỉ lệ đúng còn thấp
+    supabase
+      .from('cards')
+      .select('id,page_id,vi_text,en_text,difficulty,times_seen,times_correct,streak,next_due_at')
+      .eq('user_id', user!.id)
+      .gte('times_seen', 2)
+      .order('times_correct', { ascending: true })
+      .limit(40),
   ]);
-
-  // Câu hay sai nhất: đã gặp vài lần mà tỉ lệ đúng còn thấp
-  const { data: weak } = await supabase
-    .from('cards')
-    .select('id,page_id,vi_text,en_text,difficulty,times_seen,times_correct,streak,next_due_at')
-    .eq('user_id', user!.id)
-    .gte('times_seen', 2)
-    .order('times_correct', { ascending: true })
-    .limit(40);
 
   const weakCards = ((weak ?? []) as Card[])
     .filter((c) => c.times_seen - c.times_correct >= 2)

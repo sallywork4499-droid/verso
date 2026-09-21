@@ -6,5 +6,12 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|webp|json)$).*)'],
+  /*
+   * Bỏ qua /api: mỗi route API vốn tự kiểm tra đăng nhập và tự làm mới phiên,
+   * để middleware chạy thêm là mỗi lời gọi tốn gấp đôi số chuyến ra Supabase.
+   * Bỏ qua cả tài nguyên tĩnh và service worker.
+   */
+  matcher: [
+    '/((?!api/|_next/static|_next/image|favicon.ico|sw\\.js|.*\\.(?:svg|png|jpg|webp|json|js)$).*)',
+  ],
 };

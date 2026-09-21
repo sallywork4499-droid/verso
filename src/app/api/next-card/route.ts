@@ -20,41 +20,54 @@ export async function GET(req: Request) {
   const difficulty = (url.searchParams.get('difficulty') ?? 'sentence') as Difficulty;
   const exclude = (url.searchParams.get('exclude') ?? '').split(',').filter(Boolean);
 
-  const { data: pages } = await supabase
-    .from('pages')
-    .select('id')
-    .eq('user_id', user.id)
-    .eq('is_default', true);
+  const COLS =
+    'id,page_id,vi_text,en_text,difficulty,times_seen,times_correct,streak,next_due_at,pages!inner(is_default)';
 
-  const pageIds = (pages ?? []).map((p) => p.id);
-  if (pageIds.length === 0) {
-    return NextResponse.json({ cards: [], reason: 'empty_library' });
-  }
-
+  // Nối thẳng sang bảng pages để lọc kho mặc định trong cùng một câu hỏi,
+  // khỏi phải hỏi danh sách trang bài trước rồi mới hỏi câu
   const base = () =>
     supabase
       .from('cards')
-      .select('id,page_id,vi_text,en_text,difficulty,times_seen,times_correct,streak,next_due_at')
+      .select(COLS)
       .eq('user_id', user.id)
       .eq('difficulty', difficulty)
-      .in('page_id', pageIds);
+      .eq('pages.is_default', true);
 
-  let query = base().lte('next_due_at', new Date().toISOString()).order('next_due_at').limit(BATCH);
-  if (exclude.length) query = query.not('id', 'in', `(${exclude.join(',')})`);
-  const { data: due, error } = await query;
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-  let cards = due ?? [];
-
-  // Chưa đủ một lô thì lấy thêm câu chưa tới hạn, ưu tiên câu ít gặp nhất
-  if (cards.length < BATCH) {
-    const have = [...cards.map((c) => c.id), ...exclude];
-    let more = base().order('times_seen').limit(BATCH - cards.length);
-    if (have.length) more = more.not('id', 'in', `(${have.join(',')})`);
-    const { data: extra } = await more;
-    cards = [...cards, ...(extra ?? [])];
+  let dueQ = base().lte('next_due_at', new Date().toISOString()).order('next_due_at').limit(BATCH);
+  let restQ = base().order('times_seen').limit(BATCH * 2);
+  if (exclude.length) {
+    const list = `(${exclude.join(',')})`;
+    dueQ = dueQ.not('id', 'in', list);
+    restQ = restQ.not('id', 'in', list);
   }
+
+  // Ba câu hỏi độc lập, chạy cùng lúc
+  const [dueRes, restRes, pageCount] = await Promise.all([
+    dueQ,
+    restQ,
+    supabase
+      .from('pages')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('is_default', true),
+  ]);
+
+  if (dueRes.error) return NextResponse.json({ error: dueRes.error.message }, { status: 500 });
+
+  if ((pageCount.count ?? 0) === 0) {
+    return NextResponse.json({ cards: [], reason: 'empty_library' });
+  }
+
+  // Ưu tiên câu tới hạn, thiếu thì bù bằng câu ít gặp nhất, bỏ trùng
+  const strip = <T extends { pages?: unknown }>(c: T) => {
+    const { pages: _drop, ...rest } = c;
+    return rest;
+  };
+  const seen = new Set<string>();
+  const cards = [...(dueRes.data ?? []), ...(restRes.data ?? [])]
+    .filter((c) => (seen.has(c.id) ? false : (seen.add(c.id), true)))
+    .slice(0, BATCH)
+    .map(strip);
 
   // Xáo trộn để không lặp lại cùng một thứ tự mỗi lần mở app
   for (let i = cards.length - 1; i > 0; i--) {

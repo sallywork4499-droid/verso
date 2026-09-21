@@ -1,5 +1,32 @@
 # Nhật ký phiên bản
 
+## v2.5 — Chuyển tab nhanh hơn
+
+Chuyển giữa các tab mất 2-3 giây. Nguyên nhân chính không nằm ở code mà ở nơi đặt server.
+
+**Server đặt sai chỗ.** Vercel mặc định chạy mọi project mới ở Washington, Mỹ. Supabase thì đặt ở Singapore cho gần Việt Nam. Nên mỗi lần hỏi database, dữ liệu đi Việt Nam → Mỹ → Singapore → Mỹ → Việt Nam. Một chặng Mỹ ↔ Singapore đã mất khoảng 200 mili giây, mà mỗi trang hỏi ba bốn lần liên tiếp.
+
+Thêm file `vercel.json` đặt vùng chạy về Singapore, cùng chỗ với Supabase. Gói miễn phí của Vercel cho chọn một vùng tuỳ ý.
+
+**Kiểm tra đăng nhập hai lần mỗi lời gọi API.** Middleware chạy cả trên đường `/api`, trong khi mỗi route API vốn đã tự kiểm tra đăng nhập và tự làm mới phiên. Mỗi lần chấm bài, bốc câu, đo thời gian đều tốn thêm một chuyến ra Supabase vô ích. Bỏ `/api` khỏi phạm vi middleware.
+
+**Hỏi lần lượt những thứ hỏi cùng lúc được.** Route bốc câu hỏi danh sách trang bài trước, đợi xong mới hỏi câu tới hạn, đợi xong mới hỏi thêm câu. Nay nối thẳng bảng câu sang bảng trang bài trong một câu hỏi, và chạy ba câu hỏi còn lại song song. Từ năm chuyến nối tiếp xuống còn hai. Trang chính và trang Tiến độ cũng gom các câu hỏi độc lập lại chạy cùng lúc.
+
+**Quay lại tab vừa xem thì hiện ngay.** Trình duyệt giữ trang vừa xem trong 30 giây, bấm qua lại không phải đợi server dựng lại. Riêng khi vừa chấm câu xong mà mở Tiến độ, app tự làm mới để không hiện số liệu cũ.
+
+| Thao tác | Số chuyến trước | Số chuyến sau |
+| --- | --- | --- |
+| Mở màn hình luyện | 4 | 3 |
+| Bốc câu để dịch | 5 | 2 |
+| Mở Tiến độ | 4 | 3 |
+| Mỗi lời gọi API | thêm 1 | không thêm |
+
+Mỗi chuyến giảm từ khoảng 200 mili giây xuống vài mili giây khi server và database cùng vùng.
+
+### Cần kiểm tra khi cập nhật
+
+File `vercel.json` đặt vùng Singapore, dựa trên giả định Supabase của bạn cũng ở Singapore. Vào Supabase, Project Settings, mục General, xem dòng Region. Nếu không phải Singapore thì đổi `sin1` trong `vercel.json` sang vùng khớp — đặt lệch vùng còn chậm hơn cả lúc chưa sửa.
+
 ## v2.4 — Rà soát toàn diện
 
 Bản này không thêm tính năng lớn mà đi sửa những chỗ v2.3 còn thiếu hoặc làm sai, tìm ra bằng cách rà lại toàn bộ mã nguồn.
