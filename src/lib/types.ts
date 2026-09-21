@@ -28,6 +28,7 @@ export type Profile = {
   last_active_date: string | null;
   preferred_difficulty: Difficulty;
   timezone: string;
+  daily_goal: number;
 };
 
 export type Feedback = {

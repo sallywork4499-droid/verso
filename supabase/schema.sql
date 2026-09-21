@@ -219,3 +219,11 @@ create policy "own files write" on storage.objects
 drop policy if exists "own files delete" on storage.objects;
 create policy "own files delete" on storage.objects
   for delete using (bucket_id = 'docs' and auth.uid()::text = (storage.foldername(name))[1]);
+
+-- ============================================================
+-- v2.4: mục tiêu số câu mỗi ngày
+-- Chạy riêng phần này nếu database đã dựng từ bản trước.
+-- ============================================================
+alter table profiles
+  add column if not exists daily_goal int not null default 10
+  check (daily_goal between 1 and 200);

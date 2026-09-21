@@ -90,5 +90,23 @@ export async function POST(req: Request) {
     }
   }
 
-  return NextResponse.json({ points, profile, newBadges });
+  // Số câu đã xong hôm nay, để client cập nhật vòng mục tiêu
+  let doneToday: number | null = null;
+  if (profile) {
+    const today = new Intl.DateTimeFormat('en-CA', {
+      timeZone: profile.timezone ?? 'Asia/Ho_Chi_Minh',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+    const { data: log } = await supabase
+      .from('daily_logs')
+      .select('cards_completed')
+      .eq('user_id', user.id)
+      .eq('log_date', today)
+      .maybeSingle();
+    doneToday = log?.cards_completed ?? 0;
+  }
+
+  return NextResponse.json({ points, profile, newBadges, doneToday });
 }

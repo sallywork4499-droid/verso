@@ -55,13 +55,17 @@ async function main() {
   );
   check('Không có khoá nào → trả null, app không sập', (await pick({}, 'grade')) === null);
   check(
-    'Đọc ảnh mặc định dùng model khoẻ hơn chấm bài',
-    (await pick(gk, 'ingest'))?.model === 'gemini-2.5-flash' &&
-      (await pick(gk, 'grade'))?.model === 'gemini-2.5-flash-lite'
+    'Model mặc định không còn thuộc dòng 2.5 sắp bị khai tử',
+    (await pick(gk, 'ingest'))?.model.startsWith('gemini-3') === true,
+    (await pick(gk, 'ingest'))?.model
   );
   check(
     'Đổi được model bằng biến môi trường',
-    (await pick({ ...gk, GEMINI_MODEL_GRADE: 'gemini-3-flash' }, 'grade'))?.model === 'gemini-3-flash'
+    (await pick({ ...gk, GEMINI_MODEL_GRADE: 'model-cua-toi' }, 'grade'))?.model === 'model-cua-toi'
+  );
+  check(
+    'Nhận nhiều model cách nhau bằng dấu phẩy',
+    (await pick({ ...gk, GEMINI_MODEL_GRADE: ' a , b ' }, 'grade'))?.model === 'a'
   );
 }
 

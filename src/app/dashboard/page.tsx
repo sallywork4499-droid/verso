@@ -3,6 +3,9 @@ import { createClient } from '@/lib/supabase/server';
 import Calendar from '@/components/Calendar';
 import SignOut from '@/components/SignOut';
 import ThemePicker from '@/components/ThemePicker';
+import GoalPicker from '@/components/GoalPicker';
+import WeakCards from '@/components/WeakCards';
+import type { Card } from '@/lib/types';
 import { badgeLabel, POINT_BADGES, STREAK_BADGES } from '@/lib/scoring';
 import { dateKey } from '@/lib/session';
 
@@ -24,6 +27,24 @@ export default async function Dashboard() {
       .limit(400),
     supabase.from('badges').select('badge_key').eq('user_id', user!.id),
   ]);
+
+  // Câu hay sai nhất: đã gặp vài lần mà tỉ lệ đúng còn thấp
+  const { data: weak } = await supabase
+    .from('cards')
+    .select('id,page_id,vi_text,en_text,difficulty,times_seen,times_correct,streak,next_due_at')
+    .eq('user_id', user!.id)
+    .gte('times_seen', 2)
+    .order('times_correct', { ascending: true })
+    .limit(40);
+
+  const weakCards = ((weak ?? []) as Card[])
+    .filter((c) => c.times_seen - c.times_correct >= 2)
+    .sort(
+      (a, b) =>
+        b.times_seen - b.times_correct - (a.times_seen - a.times_correct) ||
+        a.times_correct / a.times_seen - b.times_correct / b.times_seen
+    )
+    .slice(0, 8);
 
   const tz = profile?.timezone ?? 'Asia/Ho_Chi_Minh';
   const today = dateKey(new Date(), tz);
@@ -63,7 +84,10 @@ export default async function Dashboard() {
 
       <section className="mt-10 grid grid-cols-2 gap-3">
         <Stat value={todayLog?.app_opens ?? 0} label="lần mở app hôm nay" />
-        <Stat value={todayLog?.cards_completed ?? 0} label="câu xong hôm nay" />
+        <Stat
+          value={`${todayLog?.cards_completed ?? 0}/${profile?.daily_goal ?? 10}`}
+          label="câu hôm nay so với mục tiêu"
+        />
         <Stat value={`${Math.round((todayLog?.seconds_spent ?? 0) / 60)} phút`} label="hôm nay" />
         <Stat value={`${weekMinutes} phút`} label="bảy ngày gần nhất" />
       </section>
@@ -81,6 +105,16 @@ export default async function Dashboard() {
               ` Còn ${nextStreakBadge - (profile?.current_streak ?? 0)} ngày tới mốc ${nextStreakBadge} ngày.`}
           </p>
         )}
+      </section>
+
+      <section className="mt-10">
+        <p className="mb-3 text-sm text-muted">Hay sai nhất</p>
+        <WeakCards cards={weakCards} />
+      </section>
+
+      <section className="mt-10">
+        <p className="mb-3 text-sm text-muted">Mục tiêu mỗi ngày</p>
+        <GoalPicker userId={user!.id} goal={profile?.daily_goal ?? 10} />
       </section>
 
       <section className="mt-10">

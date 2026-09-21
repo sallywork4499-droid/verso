@@ -31,7 +31,7 @@ export default async function Library() {
         <Link href="/" className="text-sm text-muted hover:text-ink">
           ← Luyện dịch
         </Link>
-        <Link href="/library/new" className="rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white shadow-brand">
+        <Link href="/library/new" className="rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-onBrand shadow-brand">
           Nạp tài liệu
         </Link>
       </header>

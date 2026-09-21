@@ -14,6 +14,8 @@ const config: Config = {
         brand: v('--c-brand'),
         brandDeep: v('--c-brand-deep'),
         lilac: v('--c-lilac'),
+        lilacText: v('--c-lilac-text'),
+        onBrand: v('--c-on-brand'),
         lilacSoft: v('--c-lilac-soft'),
         rose: v('--c-rose'),
         ink: v('--c-ink'),

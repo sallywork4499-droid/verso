@@ -8,12 +8,14 @@
   --c-card: 255 255 255;
   --c-sand: 253 237 227;
   --c-brand: 249 123 61;
-  --c-brand-deep: 217 94 34;
+  --c-brand-deep: 184 74 20;
   --c-lilac: 167 139 245;
+  --c-lilac-text: 110 82 199;
   --c-lilac-soft: 243 237 255;
-  --c-rose: 239 107 94;
+  --c-rose: 201 63 51;
   --c-ink: 43 35 32;
-  --c-muted: 154 138 130;
+  --c-on-brand: 43 35 32;
+  --c-muted: 116 102 94;
   --c-line: 244 226 214;
 
   --g1: #ffe9dc;
@@ -33,9 +35,11 @@
   --c-brand: 255 139 79;
   --c-brand-deep: 255 166 110;
   --c-lilac: 185 162 255;
+  --c-lilac-text: 185 162 255;
   --c-lilac-soft: 44 37 62;
   --c-rose: 245 128 112;
   --c-ink: 242 233 227;
+  --c-on-brand: 43 35 32;
   --c-muted: 162 147 139;
   --c-line: 58 48 42;
 
@@ -56,9 +60,11 @@
     --c-brand: 255 139 79;
     --c-brand-deep: 255 166 110;
     --c-lilac: 185 162 255;
+    --c-lilac-text: 185 162 255;
     --c-lilac-soft: 44 37 62;
     --c-rose: 245 128 112;
     --c-ink: 242 233 227;
+    --c-on-brand: 43 35 32;
     --c-muted: 162 147 139;
     --c-line: 58 48 42;
 

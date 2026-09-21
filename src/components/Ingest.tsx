@@ -5,17 +5,28 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { DIFFICULTY_LABEL } from '@/lib/scoring';
+import { parseGlossary, type LevelChoice } from '@/lib/glossary';
 import type { Difficulty, Pair } from '@/lib/types';
 
 type Row = Pair & { duplicate?: boolean; keep: boolean };
 type Step = 'pick' | 'reading' | 'review' | 'saving';
-type Source = 'image' | 'text';
+type Source = 'list' | 'text' | 'image';
 
 const ORDER: Difficulty[] = ['phrase', 'sentence', 'paragraph'];
 
+const LEVELS: { value: LevelChoice; label: string }[] = [
+  { value: 'phrase', label: 'Cụm từ' },
+  { value: 'sentence', label: 'Câu' },
+  { value: 'paragraph', label: 'Đoạn' },
+  { value: 'auto', label: 'Tự đoán' },
+];
+
 export default function Ingest() {
   const [step, setStep] = useState<Step>('pick');
-  const [source, setSource] = useState<Source>('text');
+  const [source, setSource] = useState<Source>('list');
+  const [txtList, setTxtList] = useState('');
+  const [unparsed, setUnparsed] = useState<string[]>([]);
+  const [level, setLevel] = useState<LevelChoice>('phrase');
   const [imgEn, setImgEn] = useState<string | null>(null);
   const [imgVi, setImgVi] = useState<string | null>(null);
   const [txtEn, setTxtEn] = useState('');
@@ -36,12 +47,38 @@ export default function Ingest() {
   }
 
   const ready =
-    source === 'image' ? Boolean(imgEn && imgVi) : Boolean(txtEn.trim() && txtVi.trim());
+    source === 'image'
+      ? Boolean(imgEn && imgVi)
+      : source === 'list'
+        ? txtList.trim().length > 2
+        : Boolean(txtEn.trim() && txtVi.trim());
 
   async function read() {
     if (!ready) return;
-    setStep('reading');
     setError(null);
+    setUnparsed([]);
+
+    // Danh sách từ vựng tách ngay trên máy: tức thì, không tốn hạn mức
+    if (source === 'list') {
+      const { pairs, unparsed: left } = parseGlossary(txtList, level);
+      if (pairs.length === 0) {
+        setError('Không tách được dòng nào. Mỗi dòng cần có dấu ngăn giữa từ tiếng Anh và nghĩa, ví dụ dấu gạch ngang hoặc hai chấm.');
+        return;
+      }
+      const noun =
+        level === 'auto'
+          ? 'mục'
+          : level === 'phrase'
+            ? 'từ'
+            : DIFFICULTY_LABEL[level].toLowerCase();
+      setTitle(`Danh sách ${pairs.length} ${noun}`);
+      setRows(pairs.map((p) => ({ ...p, keep: true })));
+      setUnparsed(left);
+      setStep('review');
+      return;
+    }
+
+    setStep('reading');
     try {
       const payload =
         source === 'image'
@@ -118,7 +155,7 @@ export default function Ingest() {
         <h1 className="mt-6 font-study text-3xl text-ink">Nạp tài liệu</h1>
 
         <div className="mt-6 flex gap-1">
-          {(['text', 'image'] as Source[]).map((m) => (
+          {(['list', 'text', 'image'] as Source[]).map((m) => (
             <button
               key={m}
               onClick={() => {
@@ -131,12 +168,56 @@ export default function Ingest() {
                   : 'text-muted hover:text-ink'
               }`}
             >
-              {m === 'text' ? 'Dán văn bản' : 'Chụp ảnh'}
+              {m === 'list' ? 'Danh sách từ' : m === 'text' ? 'Đoạn văn' : 'Từ ảnh'}
             </button>
           ))}
         </div>
 
-        {source === 'text' ? (
+        {source === 'list' ? (
+          <div className="mt-6 space-y-3">
+            <p className="text-sm leading-relaxed text-muted">
+              Mỗi dòng một từ hoặc cụm, kèm nghĩa. Ngăn cách bằng gạch ngang, hai chấm, dấu bằng
+              hay dấu tab đều được. App tự nhận ra vế nào là tiếng Anh.
+            </p>
+            <Field
+              label="Danh sách"
+              value={txtList}
+              onChange={setTxtList}
+              placeholder={
+                'curb emissions — hạn chế khí thải\nfall behind: tụt lại phía sau\nThe government should act now. = Chính phủ nên hành động ngay.'
+              }
+              rows={9}
+            />
+
+            <div>
+              <p className="mb-2 text-xs font-semibold text-muted">Nạp thành</p>
+              <div className="flex gap-1 rounded-2xl bg-sand p-1">
+                {LEVELS.map((l) => (
+                  <button
+                    key={l.value}
+                    type="button"
+                    onClick={() => setLevel(l.value)}
+                    aria-pressed={level === l.value}
+                    className={`flex-1 rounded-xl py-2 text-sm font-semibold transition-colors ${
+                      level === l.value ? 'bg-card text-brand shadow-card' : 'text-muted hover:text-ink'
+                    }`}
+                  >
+                    {l.label}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-xs leading-relaxed text-muted">
+                {level === 'auto'
+                  ? 'Dòng ngắn tính là cụm từ, dòng dài hoặc có dấu chấm tính là câu. Hợp khi danh sách lẫn cả hai.'
+                  : `Mọi dòng đều vào mức ${DIFFICULTY_LABEL[level].toLowerCase()}. Vẫn sửa lại từng dòng được ở bước duyệt.`}
+              </p>
+            </div>
+
+            <p className="text-xs leading-relaxed text-muted">
+              Tách ngay trên máy, không gọi model nên tức thì và không tốn hạn mức.
+            </p>
+          </div>
+        ) : source === 'text' ? (
           <div className="mt-6 space-y-3">
             <p className="text-sm leading-relaxed text-muted">
               Dán hai bản của cùng một nội dung. App tự tách câu, trích cụm từ đáng học và ghép cặp.
@@ -172,7 +253,8 @@ export default function Ingest() {
         ) : (
           <div className="mt-6 space-y-3">
             <p className="text-sm leading-relaxed text-muted">
-              Chụp hai bản của cùng một nội dung. Việc tách câu và ghép cặp để app lo.
+              Chụp mới hoặc chọn từ thư viện ảnh, hai bản của cùng một nội dung. Việc tách câu và
+              ghép cặp để app lo.
             </p>
             <Picker label="Bản tiếng Anh gốc" image={imgEn} onPick={pick('en')} />
             <Picker label="Bản dịch tiếng Việt" image={imgVi} onPick={pick('vi')} />
@@ -184,9 +266,15 @@ export default function Ingest() {
         <button
           onClick={read}
           disabled={!ready || busy}
-          className="mt-6 w-full rounded-2xl bg-brand py-3.5 font-semibold text-white shadow-brand disabled:opacity-30"
+          className="mt-6 w-full rounded-2xl bg-brand py-3.5 font-semibold text-onBrand shadow-brand disabled:opacity-30"
         >
-          {busy ? 'Đang xử lý…' : source === 'text' && !split ? 'Lưu nguyên đoạn' : 'Tách thành câu'}
+          {busy
+            ? 'Đang xử lý…'
+            : source === 'list'
+              ? 'Tách danh sách'
+              : source === 'text' && !split
+                ? 'Lưu nguyên đoạn'
+                : 'Tách thành câu'}
         </button>
         {busy && (
           <p className="mt-3 text-center text-sm text-muted">
@@ -271,6 +359,24 @@ export default function Ingest() {
         ))}
       </ul>
 
+      {unparsed.length > 0 && (
+        <div className="mt-4 rounded-2xl bg-card p-4 shadow-card">
+          <p className="text-sm font-semibold text-brandDeep">
+            {unparsed.length} dòng không tách được, đã bỏ qua
+          </p>
+          <ul className="mt-2 space-y-1">
+            {unparsed.slice(0, 5).map((u, i) => (
+              <li key={i} className="truncate text-xs text-muted">
+                {u}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs leading-relaxed text-muted">
+            Thường là dòng tiêu đề, hoặc thiếu dấu ngăn giữa từ và nghĩa.
+          </p>
+        </div>
+      )}
+
       {error && <p className="mt-4 text-sm text-rose">{error}</p>}
 
       <div className="fixed inset-x-0 bottom-0 border-t border-line bg-page/95 p-4 backdrop-blur">
@@ -278,7 +384,7 @@ export default function Ingest() {
           <button
             onClick={save}
             disabled={kept === 0 || step === 'saving'}
-            className="w-full rounded-2xl bg-brand py-3.5 font-semibold text-white shadow-brand disabled:opacity-30"
+            className="w-full rounded-2xl bg-brand py-3.5 font-semibold text-onBrand shadow-brand disabled:opacity-30"
           >
             {step === 'saving' ? 'Đang lưu…' : `Lưu ${kept} câu`}
           </button>
@@ -294,12 +400,14 @@ function Field({
   onChange,
   placeholder,
   study,
+  rows = 5,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   placeholder: string;
   study?: boolean;
+  rows?: number;
 }) {
   return (
     <label className="block rounded-2xl bg-card shadow-card p-4 focus-within:border-brand/60">
@@ -308,7 +416,7 @@ function Field({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        rows={5}
+        rows={rows}
         className={`mt-2 w-full resize-none bg-transparent leading-relaxed text-ink placeholder:text-muted/50 focus:outline-none ${
           study ? 'font-study' : ''
         }`}
@@ -330,13 +438,13 @@ function Picker({
     <label className="block cursor-pointer rounded-2xl bg-card shadow-card p-4">
       <div className="flex items-center justify-between">
         <span className={image ? 'text-brand' : 'text-muted'}>{label}</span>
-        <span className="text-sm text-muted">{image ? 'Đổi ảnh' : 'Chọn ảnh'}</span>
+        <span className="text-sm text-muted">{image ? 'Đổi ảnh' : 'Chụp hoặc chọn'}</span>
       </div>
       {image && (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={image} alt="" className="mt-3 max-h-40 w-full rounded-xl object-cover" />
       )}
-      <input type="file" accept="image/*" capture="environment" onChange={onPick} className="hidden" />
+      <input type="file" accept="image/*" onChange={onPick} className="hidden" />
     </label>
   );
 }

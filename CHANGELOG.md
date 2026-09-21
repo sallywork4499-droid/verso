@@ -1,5 +1,95 @@
 # Nhật ký phiên bản
 
+## v2.4 — Rà soát toàn diện
+
+Bản này không thêm tính năng lớn mà đi sửa những chỗ v2.3 còn thiếu hoặc làm sai, tìm ra bằng cách rà lại toàn bộ mã nguồn.
+
+### Lỗi đã sửa
+
+**Chữ quá nhạt, không đọc nổi.** Đo lại theo chuẩn WCAG AA thì bảy chỗ trong bảng màu sáng không đạt. Nặng nhất là chữ trắng trên nút cam, chỉ đạt 2.65 trên mức 4.5 cần có — mà đó lại là nút chính của app.
+
+Cách sửa giữ nguyên màu cam sáng vì đó là nhận diện của app: đổi chữ trên nút từ trắng sang nâu đen, đạt 5.81. Chữ phụ, cam làm chữ, đỏ báo lỗi và tím đều đậm lên. Bảng tối vốn đã đạt nên giữ nguyên. Có một bộ test riêng tính lại tỉ lệ tương phản cho cả 18 cặp màu, nên lần sau đổi màu mà làm hỏng là biết ngay.
+
+**Múi giờ luôn mặc định Việt Nam.** Cột `timezone` trong hồ sơ có từ đầu nhưng chưa bao giờ được ghi giá trị thật, nên ai ở múi giờ khác sẽ thấy streak và lịch lệch một ngày. Nay app đọc múi giờ từ máy và ghi vào hồ sơ, chỉ ghi khi khác giá trị đang lưu.
+
+**Không có đường lấy lại mật khẩu.** Lỗ hổng phát sinh từ lúc bỏ magic link ở v1.9: quên mật khẩu là mất tài khoản. Nay có trang đặt lại đầy đủ, vào từ liên kết ngay dưới nút đăng nhập.
+
+**Kiểm trùng khi nạp kéo cả thư viện về.** Mỗi lần nạp tài liệu, server tải toàn bộ câu của người dùng chỉ để so trùng. Thư viện càng lớn càng chậm. Nay chỉ hỏi đúng những câu sắp nạp.
+
+### Bổ sung
+
+**Mục tiêu mỗi ngày.** Đây là phần trả thưởng còn nợ từ brief đầu tiên. Vòng tròn tiến độ nằm ở thanh trên màn hình luyện, đầy dần theo số câu đã xong trong ngày. Đạt mục tiêu thì con cáo hiện ra chúc mừng, đúng một lần, không lặp lại ở những câu sau. Chọn mức 5, 10, 20 hay 30 câu trong trang Tiến độ.
+
+**Ôn lại câu hay sai.** Bảng `cards` vẫn ghi số lần gặp và số lần đúng của từng câu, nhưng trước nay chưa dùng vào việc gì. Trang Tiến độ giờ có mục gom tám câu sai nhiều nhất, chạm vào để xem bản gốc.
+
+**Chạy được offline thật.** Trước đây hàng đợi câu đã lưu trên máy, nhưng mất mạng thì trang còn không mở nổi. Thêm một service worker nhỏ lo phần khung app; dữ liệu và xác thực vẫn luôn lấy mới, không bao giờ trả bản cũ.
+
+**Lỗi không còn làm trắng màn hình.** Thêm trang chặn lỗi có nút thử lại, trang báo không tìm thấy, và vòng quay chờ khi chuyển trang.
+
+**Sửa câu lỗi ngay khi đang luyện.** Dưới đề bài có dòng "Câu này có vấn đề?", mở ra sửa cả hai vế hoặc xoá hẳn câu, không phải bỏ dở đi vòng qua Thư viện. Hay dùng với câu tách từ ảnh bị đọc sai chữ.
+
+**Tìm kiếm trong thư viện,** hiện khi có từ năm trang bài trở lên.
+
+### Cần làm khi cập nhật
+
+Database có thêm một cột. Vào Supabase, mở SQL Editor và chạy:
+
+```sql
+alter table profiles
+  add column if not exists daily_goal int not null default 10
+  check (daily_goal between 1 and 200);
+```
+
+Không chạy thì trang Tiến độ và vòng mục tiêu sẽ lỗi.
+
+## v2.3 — Danh sách nạp được cả câu
+
+**Thanh chọn mức ngay trong tab Danh sách:** Cụm từ, Câu, Đoạn, Tự đoán. Trước đây mọi dòng đều vào mức Cụm từ, nên muốn nạp một danh sách câu thì phải sửa tay từng dòng ở bước duyệt.
+
+**Tự đoán từng dòng.** Hợp khi danh sách lẫn cả cụm từ lẫn câu. Cách đoán dựa vào vế tiếng Anh: từ sáu chữ trở lên, hoặc kết thúc bằng dấu chấm, thì tính là câu; nhiều câu liền nhau thì tính là đoạn; ngắn và không có dấu kết câu thì là cụm từ. Vế tiếng Việt dài bất thường cũng được coi là dấu hiệu của câu, để bắt những trường hợp nghĩa được diễn giải dài.
+
+**Vẫn sửa được từng dòng** ở bước duyệt như cũ, nên đoán sai cũng không sao.
+
+**Tên trang bài phản ánh mức đã chọn**, ví dụ "Danh sách 24 câu" thay vì luôn là "từ".
+
+## v2.2 — Nạp bằng danh sách từ vựng
+
+**Chế độ thứ ba khi nạp liệu.** Ba tab: Danh sách từ, Đoạn văn, Từ ảnh. Tab đầu nhận một danh sách từ vựng dán vào, mỗi dòng một từ hoặc cụm kèm nghĩa.
+
+**Tách ngay trên máy, không gọi model.** Danh sách vốn đã có cấu trúc nên không cần model đoán. Kết quả hiện tức thì, không tốn hạn mức, và không hỏng khi mất mạng.
+
+**Nhận nhiều kiểu trình bày.** Dấu ngăn có thể là gạch ngang, gạch dài, hai chấm, dấu bằng, gạch đứng hay dấu tab — nên dán thẳng từ bảng Excel hay Google Sheets cũng chạy.
+
+**Tự đoán vế nào là tiếng Anh** bằng dấu thanh tiếng Việt, nên dán theo chiều nào cũng được.
+
+**Không cắt nhầm những chỗ hay hỏng.** Gạch nối trong `well-being` hay `state-of-the-art` được giữ nguyên, vì dấu gạch chỉ tính là dấu ngăn khi có khoảng trắng bao quanh. Dòng tiêu đề kiểu "Chương 3: từ vựng" bị bỏ qua, vì cả hai vế đều là tiếng Việt nên không thể là cặp Anh - Việt.
+
+**Dọn rác đầu dòng và cuối dòng:** số thứ tự, dấu chấm đầu dòng, ngoặc kép bao quanh, dấu câu thừa. Cặp trùng nhau chỉ giữ bản đầu tiên.
+
+**Báo rõ dòng nào bị bỏ.** Bước duyệt liệt kê những dòng không tách được để người dùng tự sửa, thay vì im lặng nuốt mất.
+
+## v2.1 — Dùng đúng model Google khuyến nghị
+
+Google trả về thông báo rất cụ thể: `gemini-2.5-flash` không còn mở cho tài khoản mới, và khuyên dùng `gemini-3.6-flash`. Tên tôi đoán ở v2.0 chưa khớp với thứ tài khoản này được cấp.
+
+**Đặt `gemini-3.6-flash` lên đầu danh sách**, giữ các tên khác phía sau làm lưới an toàn.
+
+**Nhớ model nào vừa chạy được.** Lần gọi sau trong cùng một tiến trình đi thẳng tới model đó, khỏi thử lại những cái đã chết. Đỡ một hai giây mỗi lần và đỡ tốn lượt gọi. Model đang nhớ mà hỏng thì tự quên đi và dò lại từ đầu.
+
+## v2.0 — Chọn ảnh từ thư viện, và Gemini bền hơn
+
+**Chọn ảnh từ thư viện.** Trước đây ô chọn ảnh có thuộc tính `capture`, khiến điện thoại mở thẳng camera và không cho lấy ảnh có sẵn. Bỏ thuộc tính đó đi, giờ bấm vào là hệ điều hành cho chọn giữa chụp mới và lấy từ thư viện.
+
+**Đổi model Gemini mặc định.** Dòng 2.5 sẽ ngừng hoạt động từ tháng 10/2026, tức là app sẽ tự chết sau vài tuần nữa nếu để nguyên. Mặc định chuyển sang dòng 3.
+
+**Thử nhiều model thay vì một.** Mỗi việc giờ có một danh sách model xếp theo thứ tự ưu tiên. Model đầu không tồn tại hay không có quyền thì tự thử cái kế tiếp, dừng lại ở cái đầu tiên chạy được. Google đổi tên và khai tử model khá thường xuyên, để một mình một model là app chết theo.
+
+**Phân biệt lỗi nên thử tiếp và lỗi phải dừng.** Model không tồn tại thì thử model khác. Nhưng vượt hạn mức hay khoá sai thì dừng ngay, vì thử thêm chỉ tốn thời gian và làm hạn mức cạn nhanh hơn.
+
+**Thông báo lỗi nói rõ phải làm gì.** Khoá sai thì chỉ đường tạo khoá mới. Vượt hạn mức thì bảo đợi. Nội dung quá dài thì bảo thử đoạn ngắn hơn. Hết model thì liệt kê đã thử những gì.
+
+**Lỗi chấm bài hiện lên màn hình.** Trước đây chỉ hiện một câu chung chung, không biết vì sao. Nay hiện đúng nguyên nhân, kèm dòng nhắc rằng bản gốc vẫn đủ để tự đối chiếu nên việc học không bị chặn.
+
 ## v1.9 — Đăng nhập bằng email và mật khẩu
 
 **Bỏ magic link.** Cách cũ gửi một đường liên kết qua email, nghe thì tiện nhưng có bốn chỗ hỏng được: phải cấu hình Redirect URL đúng tuyệt đối, email dễ rơi vào hộp thư rác, liên kết bắt buộc mở trên đúng thiết bị vừa nhập email, và hạn mức gửi email miễn phí của Supabase khá thấp.

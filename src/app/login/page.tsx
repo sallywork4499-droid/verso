@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import Mascot from '@/components/Mascot';
@@ -133,7 +134,7 @@ export default function Login() {
           <button
             type="submit"
             disabled={!ready || busy}
-            className="w-full rounded-2xl bg-brand py-3.5 font-semibold text-white shadow-brand disabled:opacity-35 disabled:shadow-none"
+            className="w-full rounded-2xl bg-brand py-3.5 font-semibold text-onBrand shadow-brand disabled:opacity-35 disabled:shadow-none"
           >
             {busy ? 'Đang xử lý…' : mode === 'in' ? 'Đăng nhập' : 'Tạo tài khoản'}
           </button>
@@ -141,6 +142,15 @@ export default function Login() {
           {error && <p className="text-sm leading-relaxed text-rose">{error}</p>}
           {notice && <p className="text-sm leading-relaxed text-brandDeep">{notice}</p>}
         </form>
+
+        {mode === 'in' && (
+          <Link
+            href="/reset"
+            className="mt-4 block text-center text-sm font-semibold text-brandDeep"
+          >
+            Quên mật khẩu?
+          </Link>
+        )}
 
         <p className="mt-7 text-sm leading-relaxed text-muted">
           {mode === 'in'

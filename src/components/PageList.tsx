@@ -11,6 +11,7 @@ const ORDER: Difficulty[] = ['phrase', 'sentence', 'paragraph'];
 export default function PageList({ pages }: { pages: Page[] }) {
   const [open, setOpen] = useState<string | null>(null);
   const [list, setList] = useState(pages);
+  const [q, setQ] = useState('');
   const router = useRouter();
   const supabase = createClient();
 
@@ -36,9 +37,24 @@ export default function PageList({ pages }: { pages: Page[] }) {
     );
   }
 
+  const needle = q.trim().toLowerCase();
+  const shown = needle ? list.filter((p) => p.title.toLowerCase().includes(needle)) : list;
+
   return (
+    <>
+      {list.length > 4 && (
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Tìm trang bài…"
+          className="mb-4 w-full rounded-2xl bg-card px-4 py-3 shadow-card placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-brand/60"
+        />
+      )}
+      {shown.length === 0 && (
+        <p className="leading-relaxed text-muted">Không có trang bài nào khớp.</p>
+      )}
     <ul className="space-y-3">
-      {list.map((page) => (
+      {shown.map((page) => (
         <li key={page.id} className="rounded-2xl bg-card shadow-card">
           <div className="flex items-center gap-3 p-4">
             <button
@@ -60,6 +76,7 @@ export default function PageList({ pages }: { pages: Page[] }) {
         </li>
       ))}
     </ul>
+    </>
   );
 }
 

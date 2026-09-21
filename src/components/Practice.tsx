@@ -6,6 +6,7 @@ import { DIFFICULTY_LABEL, badgeLabel } from '@/lib/scoring';
 import { afterCorrect, afterWrong, mergeQueue } from '@/lib/session';
 import { createClient } from '@/lib/supabase/client';
 import Mascot from '@/components/Mascot';
+import GoalRing from '@/components/GoalRing';
 import type { Card, Difficulty, Feedback, Profile } from '@/lib/types';
 
 const ORDER: Difficulty[] = ['phrase', 'sentence', 'paragraph'];
@@ -16,11 +17,19 @@ const LOW_WATER = 3; // còn ít hơn chừng này câu thì nạp thêm
 
 type Phase = 'writing' | 'revealed';
 
-export default function Practice({ profile }: { profile: Profile }) {
+export default function Practice({
+  profile,
+  doneToday: initialDone,
+}: {
+  profile: Profile;
+  doneToday: number;
+}) {
   const [difficulty, setDifficulty] = useState<Difficulty>(profile.preferred_difficulty);
   const [queue, setQueue] = useState<Card[]>([]);
   const [loading, setLoading] = useState(true);
   const [doneThisSession, setDoneThisSession] = useState(0);
+  const [doneToday, setDoneToday] = useState(initialDone);
+  const [goalHit, setGoalHit] = useState(false);
   const [emptyReason, setEmptyReason] = useState<string | null>(null);
 
   const [answer, setAnswer] = useState('');
@@ -33,7 +42,10 @@ export default function Practice({ profile }: { profile: Profile }) {
 
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [grading, setGrading] = useState(false);
-  const [gradeError, setGradeError] = useState(false);
+  const [gradeError, setGradeError] = useState<string | null>(null);
+  const [fixing, setFixing] = useState(false);
+  const [fixVi, setFixVi] = useState('');
+  const [fixEn, setFixEn] = useState('');
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
   // Câu nào đã từng bị đánh sai trong phiên này — theo từng câu, không dùng chung một cờ
@@ -163,15 +175,19 @@ export default function Practice({ profile }: { profile: Profile }) {
     inputRef.current?.blur();
 
     setGrading(true);
-    setGradeError(false);
+    setGradeError(null);
     fetch('/api/grade', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ vi: card.vi_text, en: card.en_text, answer }),
     })
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((d: Feedback) => setFeedback(d))
-      .catch(() => setGradeError(true))
+      .then(async (r) => {
+        const d = await r.json().catch(() => null);
+        if (!r.ok) throw new Error(d?.error ?? 'Chưa chấm được lúc này');
+        return d as Feedback;
+      })
+      .then(setFeedback)
+      .catch((e) => setGradeError(e instanceof Error ? e.message : 'Chưa chấm được lúc này'))
       .finally(() => setGrading(false));
   }
 
@@ -198,6 +214,15 @@ export default function Practice({ profile }: { profile: Profile }) {
     if (res?.profile) {
       setPoints(res.profile.total_points);
       setStreak(res.profile.current_streak);
+    }
+    if (typeof res?.doneToday === 'number') {
+      const before = doneToday;
+      setDoneToday(res.doneToday);
+      // Chỉ ăn mừng đúng lúc vừa chạm mốc, không lặp lại mỗi câu sau đó
+      if (before < profile.daily_goal && res.doneToday >= profile.daily_goal) {
+        setGoalHit(true);
+        setTimeout(() => setGoalHit(false), 3600);
+      }
     }
     if (correct && res?.points) {
       setGained(res.points);
@@ -226,10 +251,38 @@ export default function Practice({ profile }: { profile: Profile }) {
     setAnswer('');
     setPhase('writing');
     setFeedback(null);
-    setGradeError(false);
+    setGradeError(null);
     setQueue(next);
     if (next.length < LOW_WATER) refill(difficulty, 'append');
     requestAnimationFrame(() => inputRef.current?.focus());
+  }
+
+  function openFix() {
+    if (!card) return;
+    setFixVi(card.vi_text);
+    setFixEn(card.en_text);
+    setFixing(true);
+  }
+
+  /** Lưu sửa đổi, cập nhật luôn câu đang hiện để khỏi phải tải lại. */
+  async function saveFix() {
+    if (!card) return;
+    const vi = fixVi.trim();
+    const en = fixEn.trim();
+    if (!vi || !en) return;
+    setQueue((cur) => cur.map((c) => (c.id === card.id ? { ...c, vi_text: vi, en_text: en } : c)));
+    setFixing(false);
+    await createClient().from('cards').update({ vi_text: vi, en_text: en }).eq('id', card.id);
+  }
+
+  /** Bỏ hẳn câu hỏng khỏi kho. */
+  async function dropCard() {
+    if (!card) return;
+    if (!confirm('Xoá hẳn câu này khỏi thư viện?')) return;
+    const id = card.id;
+    setFixing(false);
+    advance(queue.filter((c) => c.id !== id));
+    await createClient().from('cards').delete().eq('id', id);
   }
 
   function retry() {
@@ -242,7 +295,14 @@ export default function Practice({ profile }: { profile: Profile }) {
   /* ---------- giao diện ---------- */
   return (
     <div className="flex min-h-[100dvh] flex-col">
-      <StatusBar streak={streak} points={points} gained={gained} done={doneThisSession} />
+      <StatusBar
+        streak={streak}
+        points={points}
+        gained={gained}
+        done={doneThisSession}
+        doneToday={doneToday}
+        goal={profile.daily_goal}
+      />
 
       <div className="flex gap-1 px-4 pb-3 pt-1">
         {ORDER.map((d) => (
@@ -299,7 +359,7 @@ export default function Practice({ profile }: { profile: Profile }) {
                 <button
                   onClick={check}
                   disabled={!answer.trim()}
-                  className="w-full rounded-2xl bg-brand py-3.5 font-semibold text-white shadow-brand transition-opacity disabled:opacity-30"
+                  className="w-full rounded-2xl bg-brand py-3.5 font-semibold text-onBrand shadow-brand transition-opacity disabled:opacity-30"
                 >
                   Kiểm tra
                 </button>
@@ -320,6 +380,18 @@ export default function Practice({ profile }: { profile: Profile }) {
         )}
       </main>
 
+      {fixing && card && (
+        <FixSheet
+          vi={fixVi}
+          en={fixEn}
+          onVi={setFixVi}
+          onEn={setFixEn}
+          onSave={saveFix}
+          onDrop={dropCard}
+          onClose={() => setFixing(false)}
+        />
+      )}
+      {goalHit && <GoalToast goal={profile.daily_goal} />}
       {badge && <BadgeToast badgeKey={badge} />}
     </div>
   );
@@ -332,15 +404,20 @@ function StatusBar({
   points,
   gained,
   done,
+  doneToday,
+  goal,
 }: {
   streak: number;
   points: number;
   gained: number | null;
   done: number;
+  doneToday: number;
+  goal: number;
 }) {
   return (
     <header className="flex items-center justify-between px-4 pt-3 text-sm">
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
+        <GoalRing done={doneToday} goal={goal} />
         <span className="text-brand">🔥 {streak}</span>
         <span className="relative text-muted">
           {points.toLocaleString('vi-VN')}
@@ -376,7 +453,7 @@ function Review({
   answer: string;
   feedback: Feedback | null;
   grading: boolean;
-  gradeError: boolean;
+  gradeError: string | null;
   onCorrect: () => void;
   onWrong: () => void;
   onRetry: () => void;
@@ -389,7 +466,7 @@ function Review({
       </div>
 
       <div className="rounded-2xl border border-lilac/30 bg-lilac/5 p-4">
-        <p className="mb-1 text-xs text-lilac">Bản gốc</p>
+        <p className="mb-1 text-xs text-lilacText">Bản gốc</p>
         <p className="leading-relaxed text-ink">{card.en_text}</p>
       </div>
 
@@ -402,7 +479,7 @@ function Review({
         </button>
         <button
           onClick={onCorrect}
-          className="flex-1 rounded-2xl bg-brand py-3 font-semibold text-white shadow-brand"
+          className="flex-1 rounded-2xl bg-brand py-3 font-semibold text-onBrand shadow-brand"
         >
           Đúng rồi
         </button>
@@ -414,9 +491,12 @@ function Review({
 
       {grading && <p className="text-center text-sm text-muted">Đang chấm kỹ hơn…</p>}
       {gradeError && (
-        <p className="text-center text-sm text-muted">
-          Chưa chấm được lúc này. Bản gốc ở trên vẫn đủ để tự đối chiếu.
-        </p>
+        <div className="rounded-2xl bg-card p-4 shadow-card">
+          <p className="text-sm leading-relaxed text-rose">{gradeError}</p>
+          <p className="mt-2 text-xs leading-relaxed text-muted">
+            Bản gốc ở trên vẫn đủ để tự đối chiếu, việc học không bị chặn.
+          </p>
+        </div>
       )}
       {feedback && <FeedbackCard feedback={feedback} />}
     </div>
@@ -426,7 +506,7 @@ function Review({
 function FeedbackCard({ feedback }: { feedback: Feedback }) {
   const tone =
     feedback.verdict === 'sát nghĩa'
-      ? 'text-lilac'
+      ? 'text-lilacText'
       : feedback.verdict === 'lệch nhẹ'
         ? 'text-brand'
         : 'text-rose';
@@ -443,7 +523,7 @@ function FeedbackCard({ feedback }: { feedback: Feedback }) {
               <p>
                 <span className="text-rose line-through">{e.wrong}</span>
                 <span className="text-muted"> → </span>
-                <span className="text-lilac">{e.fix}</span>
+                <span className="text-lilacText">{e.fix}</span>
               </p>
               <p className="mt-0.5 text-xs text-muted">{e.why}</p>
             </div>
@@ -489,7 +569,7 @@ function EmptyState({ reason, difficulty }: { reason: string | null; difficulty:
         Chưa có gì để dịch. Chụp bản tiếng Anh và bản tiếng Việt của một tài liệu, phần còn lại tự
         động.
       </p>
-      <Link href="/library/new" className="rounded-2xl bg-brand px-6 py-3 font-semibold text-white shadow-brand">
+      <Link href="/library/new" className="rounded-2xl bg-brand px-6 py-3 font-semibold text-onBrand shadow-brand">
         Nạp tài liệu đầu tiên
       </Link>
     </div>
@@ -500,6 +580,87 @@ function Centered({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex flex-1 items-center justify-center px-8 text-center leading-relaxed text-muted">
       {children}
+    </div>
+  );
+}
+
+function FixSheet({
+  vi,
+  en,
+  onVi,
+  onEn,
+  onSave,
+  onDrop,
+  onClose,
+}: {
+  vi: string;
+  en: string;
+  onVi: (v: string) => void;
+  onEn: (v: string) => void;
+  onSave: () => void;
+  onDrop: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-20 flex items-end justify-center bg-ink/40 p-3">
+      <div className="reveal w-full max-w-md rounded-3xl bg-card p-5 shadow-lift">
+        <p className="font-bold">Sửa câu này</p>
+        <p className="mt-1 text-xs leading-relaxed text-muted">
+          Hay gặp với câu tách từ ảnh: chữ đọc sai, hoặc ghép nhầm cặp.
+        </p>
+
+        <label className="mt-4 block text-xs font-semibold text-muted">Tiếng Việt</label>
+        <textarea
+          value={vi}
+          onChange={(e) => onVi(e.target.value)}
+          rows={3}
+          className="mt-1 w-full resize-none rounded-2xl bg-sand p-3 leading-relaxed focus:outline-none focus:ring-2 focus:ring-brand/60"
+        />
+
+        <label className="mt-3 block text-xs font-semibold text-muted">Tiếng Anh gốc</label>
+        <textarea
+          value={en}
+          onChange={(e) => onEn(e.target.value)}
+          rows={3}
+          className="mt-1 w-full resize-none rounded-2xl bg-sand p-3 leading-relaxed focus:outline-none focus:ring-2 focus:ring-brand/60"
+        />
+
+        <div className="mt-4 flex gap-2">
+          <button
+            onClick={onClose}
+            className="flex-1 rounded-2xl bg-sand py-3 font-semibold text-muted"
+          >
+            Thôi
+          </button>
+          <button
+            onClick={onSave}
+            disabled={!vi.trim() || !en.trim()}
+            className="flex-1 rounded-2xl bg-brand py-3 font-semibold text-onBrand shadow-brand disabled:opacity-35"
+          >
+            Lưu
+          </button>
+        </div>
+        <button
+          onClick={onDrop}
+          className="mt-3 w-full py-1 text-sm font-semibold text-rose"
+        >
+          Xoá hẳn câu này
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function GoalToast({ goal }: { goal: number }) {
+  return (
+    <div className="pointer-events-none fixed inset-x-0 bottom-24 flex justify-center px-4">
+      <div className="pop flex items-center gap-3 rounded-2xl bg-card px-5 py-3 shadow-lift">
+        <Mascot size={36} mood="cheer" />
+        <div>
+          <p className="text-sm font-bold text-brandDeep">Xong mục tiêu hôm nay</p>
+          <p className="text-xs text-muted">{goal} câu. Làm thêm vẫn tính điểm.</p>
+        </div>
+      </div>
     </div>
   );
 }

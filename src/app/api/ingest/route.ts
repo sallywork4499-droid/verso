@@ -54,10 +54,14 @@ async function markDuplicates(
   userId: string,
   pairs: Pair[]
 ) {
+  // Chỉ hỏi những câu sắp nạp, thay vì kéo cả thư viện về
+  const wanted = Array.from(new Set(pairs.map((p) => p.vi.trim()))).slice(0, 300);
   const { data: existing } = await supabase
     .from('cards')
     .select('vi_text')
-    .eq('user_id', userId);
+    .eq('user_id', userId)
+    .in('vi_text', wanted);
+
   const seen = new Set((existing ?? []).map((c) => c.vi_text.trim().toLowerCase()));
   return pairs.map((p) => ({ ...p, duplicate: seen.has(p.vi.trim().toLowerCase()) }));
 }

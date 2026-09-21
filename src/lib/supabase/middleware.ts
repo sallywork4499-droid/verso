@@ -60,6 +60,7 @@ export async function updateSession(request: NextRequest) {
 
     const isPublic =
       path.startsWith('/login') ||
+      path.startsWith('/reset') ||
       path.startsWith('/auth') ||
       path.startsWith('/setup') ||
       path.startsWith('/manifest') ||

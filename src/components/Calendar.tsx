@@ -23,8 +23,8 @@ const keyOf = (y: number, m0: number, d: number) => `${y}-${pad(m0 + 1)}-${pad(d
 function tone(n: number) {
   if (n === 0) return 'bg-sand text-muted';
   if (n < 3) return 'bg-brand/25 text-brandDeep font-semibold';
-  if (n < 8) return 'bg-brand/60 text-white font-semibold';
-  return 'bg-brand text-white font-bold';
+  if (n < 8) return 'bg-brand/70 text-onBrand font-semibold';
+  return 'bg-brand text-onBrand font-bold';
 }
 
 export default function Calendar({ logs, timezone }: { logs: Log[]; timezone: string }) {
