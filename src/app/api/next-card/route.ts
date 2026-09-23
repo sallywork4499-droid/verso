@@ -5,7 +5,7 @@ import type { Card } from '@/lib/types';
 
 const BATCH = 12;
 /** Trần số câu lấy về một lượt. Một đoạn thường vài chục câu, học cả chục đoạn vẫn dư. */
-const POOL_CAP = 600;
+const POOL_CAP = 1000;
 
 /**
  * Bốc một lô câu cho màn hình luyện, chỉ trong những đoạn đang chọn
@@ -41,6 +41,10 @@ export async function POST(req: Request) {
       .eq('user_id', user.id)
       .eq('pages.is_default', true)
       .in('difficulty', levels)
+      // Sắp theo hạn ôn: câu tới hạn lâu nhất lên đầu, câu vừa dịch đúng
+      // có hạn đẩy sang mai nên rơi xuống cuối. Nhờ vậy, kho lớn hơn trần
+      // một lô thì phần bị cắt là phần ít cần nhất.
+      .order('next_due_at', { ascending: true })
       .limit(POOL_CAP),
     supabase.from('pages').select('id,is_default').eq('user_id', user.id),
   ]);
@@ -75,5 +79,7 @@ export async function POST(req: Request) {
     [batch[i], batch[j]] = [batch[j], batch[i]];
   }
 
-  return NextResponse.json({ cards: batch, total, reason: null });
+  // Hết câu chưa làm trong lô này, nhưng kho vẫn còn câu: client sẽ mời tải thêm
+  const reason = batch.length === 0 ? 'batch_empty' : null;
+  return NextResponse.json({ cards: batch, total, reason });
 }

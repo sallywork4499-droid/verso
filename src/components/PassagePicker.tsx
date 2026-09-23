@@ -51,12 +51,16 @@ export default function PassagePicker({
   const cards = pages.filter((p) => picked.has(p.id)).reduce((s, p) => s + p.card_count, 0);
 
   return (
-    <div className="fixed inset-0 z-30 flex items-end justify-center bg-ink/40" onClick={onClose}>
+    <div
+      className="fixed inset-x-0 z-30 flex items-end justify-center bg-ink/40"
+      style={{ top: 'var(--app-top, 0px)', height: 'var(--app-h, 100dvh)' }}
+      onClick={onClose}
+    >
       <div
-        className="reveal flex max-h-[88dvh] w-full max-w-md flex-col rounded-t-3xl bg-card shadow-lift"
+        className="reveal flex max-h-full w-full max-w-md flex-col overflow-hidden rounded-t-3xl bg-card shadow-lift"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-5 pb-3 pt-5">
+        <div className="flex-none px-5 pb-3 pt-5">
           <div className="flex items-center justify-between">
             <p className="text-lg font-bold">Chọn đoạn để luyện</p>
             <button onClick={onClose} className="px-2 text-sm font-semibold text-muted hover:text-ink">
@@ -92,7 +96,7 @@ export default function PassagePicker({
           </div>
         </div>
 
-        <ul className="flex-1 space-y-2 overflow-y-auto px-5 pb-3">
+        <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain px-5 pb-3">
           {shown.length === 0 && (
             <li className="py-6 text-center text-sm text-muted">Không có đoạn nào khớp.</li>
           )}
@@ -134,7 +138,7 @@ export default function PassagePicker({
           })}
         </ul>
 
-        <div className="border-t border-line px-5 pb-5 pt-3">
+        <div className="flex-none border-t border-line px-5 pb-5 pt-3">
           {pages.length === 0 ? (
             <Link
               href="/library/new"

@@ -1,5 +1,53 @@
 # Nhật ký phiên bản
 
+## v2.10 — Rà soát: năm lỗi
+
+Rà lại toàn bộ mã nguồn sau v2.9.1. Không thêm tính năng, chỉ sửa.
+
+**Bấm hai lần là ghi hai lần.** Nút "Đúng rồi" và "Chưa đúng" không khoá trong lúc đang gửi kết quả. Bấm nhanh hai cái là ghi hai bài làm, cộng điểm hai lần, và chuỗi combo nhảy sai. Nay nút mờ đi cho tới khi ghi xong.
+
+**Kho lớn báo nhầm là chưa có gì để dịch.** Mỗi lượt app lấy về tối đa một lô câu. Nếu lựa chọn có nhiều câu hơn trần đó và bạn đã làm hết phần lấy về, app trả về rỗng mà không kèm lý do, nên màn hình hiện "Chưa có gì để dịch, nạp đoạn đầu tiên" dù thư viện đầy ắp.
+
+Sửa ba lớp: nâng trần một lô, sắp câu theo hạn ôn nên phần bị cắt là phần ít cần nhất, và thêm màn hình riêng nói rõ còn bao nhiêu mục chưa dịch đúng kèm nút tải thêm.
+
+**Đăng xuất không dọn dữ liệu trên máy.** Chỉ xoá hàng đợi và bản nháp, còn tiến độ theo ngày, lựa chọn giao diện và các trang service worker đã lưu thì để nguyên. Người khác đăng nhập trên cùng máy có thể thấy phần còn lại. Nay xoá sạch mọi thứ có tiền tố `verso:` cùng toàn bộ trang đã lưu, và không đụng dữ liệu của app khác trên cùng tên miền.
+
+**Vào Thư viện không làm mới.** Sau khi sửa hoặc xoá câu ngay trong lúc luyện, mở Thư viện vẫn thấy số liệu cũ tới 30 giây. Trang Tiến độ đã xử lý việc này từ v2.5 nhưng Thư viện thì sót.
+
+**Đọc màn hình không biết đã sang câu mới.** Khung đề bài giờ được đánh dấu là vùng nội dung thay đổi, nên trình đọc màn hình thông báo khi chuyển câu.
+
+### Chỗ cân nhắc chứ không phải lỗi
+
+Trong lúc sửa phần đăng xuất, tôi có thử bỏ hẳn việc lưu trang để tránh giữ nội dung của tài khoản cũ. Nhưng làm vậy là mất luôn khả năng mở app khi không có mạng, thứ đã làm ở v2.4. Giữ lại phần lưu trang và dọn sạch lúc đăng xuất là cân bằng hợp lý hơn.
+
+## v2.9.1 — Sửa lỗi không cuộn được danh sách đoạn
+
+**Lỗi.** Hộp chọn đoạn chỉ hiện ba đoạn đầu và không vuốt lên xem tiếp được. Có nhiều hơn ba đoạn là không chọn được những đoạn còn lại.
+
+**Nguyên nhân.** Danh sách có bật cuộn nhưng thiếu `min-h-0`. Trong một khung xếp dọc, phần tử mặc định không được thu nhỏ hơn nội dung của nó, nên danh sách cứ giãn theo số đoạn, tràn khỏi khung thay vì biến phần thừa thành vùng cuộn. Phần tràn nằm ngoài màn hình nên không cách nào tới được.
+
+**Sửa.** Thêm `min-h-0` cho danh sách, `overflow-hidden` cho khung ngoài, và cố định phần đầu với phần chân để chỉ danh sách ở giữa cuộn.
+
+Đã quét toàn bộ app tìm những vùng cuộn mắc lỗi cùng kiểu: cả ba chỗ còn lại đều đã đúng.
+
+## v2.9 — Bàn phím không còn che mất đề bài
+
+**Vấn đề.** Trên màn hình điện thoại, mở bàn phím lên là đoạn văn bị đẩy khuất. Ô nhập cộng bàn phím chiếm gần hết chỗ, nên vừa gõ vừa đọc đề bài thì không được.
+
+**Gốc rễ: đo sai chiều cao.** Bố cục cũ tính theo `100dvh`, tức cả màn hình. Safari trên iPhone không co con số đó lại khi bàn phím hiện ra, nó chỉ đẩy trang lên, nên phần dưới nằm sau bàn phím. Nay app hỏi `visualViewport` phần màn hình nào còn thật sự nhìn thấy được rồi dựng bố cục theo đúng phần đó. Trình duyệt cũ không hỗ trợ thì lùi về chiều cao cửa sổ.
+
+**Đề bài có khung cuộn riêng.** Đoạn văn chiếm phần trên và cuộn được bên trong khung của nó, nên luôn thấy một phần và vuốt để đọc tiếp. Sang câu mới thì khung tự cuộn về đầu.
+
+**Ô nhập tự cao dần.** Bắt đầu ở hai dòng rồi giãn theo lượng chữ đang gõ, tối đa khoảng một phần ba màn hình. Trước đây mức Đoạn chiếm cứng sáu dòng dù chưa gõ chữ nào.
+
+**Cỡ chữ co theo độ dài đề bài,** từ 26px cho câu ngắn xuống 16px cho đoạn rất dài, thay cho hai cỡ cứng nhảy nấc đột ngột giữa mức Câu và mức Đoạn.
+
+**Nút "Xem lại cả đoạn"** dưới nút Kiểm tra, chỉ hiện với đề bài dài. Bấm là đoạn trượt lên che tạm ô nhập; đóng lại thì con trỏ về đúng cuối chữ đang gõ dở.
+
+**Màn hình đối chiếu cuộn được.** Sau khi bấm Kiểm tra, bài bạn viết cùng bản gốc và nhận xét xếp chồng nhau; với đoạn dài thì phần này giờ cuộn trong khung thay vì tràn ra ngoài.
+
+**Hai tấm trượt cũng bám theo vùng còn thấy:** hộp chọn đoạn và hộp sửa câu, vì cả hai đều có ô nhập nên trước đây cũng nằm sau bàn phím.
+
 ## v2.8 — Học theo đoạn
 
 **Vấn đề.** App bốc ngẫu nhiên từ mọi đoạn đang bật, lọc theo một mức duy nhất. Cụm từ của đoạn A có thể đứng ngay trước một câu của đoạn B. Với người học theo từng đoạn thì chuyện lộn xộn này là tất nhiên.

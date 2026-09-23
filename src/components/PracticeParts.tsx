@@ -17,7 +17,7 @@ export function StatusBar({
   done,
   doneToday,
   goal,
-  onOpenDashboard,
+  onNavigate,
 }: {
   streak: number;
   points: number;
@@ -25,7 +25,7 @@ export function StatusBar({
   done: number;
   doneToday: number;
   goal: number;
-  onOpenDashboard: (e: React.MouseEvent<HTMLAnchorElement>) => void;
+  onNavigate: (e: React.MouseEvent<HTMLAnchorElement>, to: string) => void;
 }) {
   return (
     <header className="flex items-center justify-between px-4 pt-3 text-sm">
@@ -41,10 +41,10 @@ export function StatusBar({
         {done > 0 && <span className="text-muted/70">{done} câu phiên này</span>}
       </div>
       <nav className="flex gap-4 text-muted">
-        <Link href="/library" className="hover:text-ink">
+        <Link href="/library" onClick={(e) => onNavigate(e, '/library')} className="hover:text-ink">
           Thư viện
         </Link>
-        <Link href="/dashboard" onClick={onOpenDashboard} className="hover:text-ink">
+        <Link href="/dashboard" onClick={(e) => onNavigate(e, '/dashboard')} className="hover:text-ink">
           Tiến độ
         </Link>
       </nav>
@@ -62,6 +62,7 @@ export function Review({
   onWrong,
   onRetry,
   onRegrade,
+  busy,
 }: {
   card: Card;
   answer: string;
@@ -72,6 +73,7 @@ export function Review({
   onWrong: () => void;
   onRetry: () => void;
   onRegrade: () => void;
+  busy: boolean;
 }) {
   return (
     <div className="reveal space-y-4">
@@ -200,8 +202,11 @@ export function FixSheet({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-20 flex items-end justify-center bg-ink/40 p-3">
-      <div className="reveal w-full max-w-md rounded-3xl bg-card p-5 shadow-lift">
+    <div
+      className="fixed inset-x-0 z-20 flex items-end justify-center bg-ink/40 p-3"
+      style={{ top: 'var(--app-top, 0px)', height: 'var(--app-h, 100dvh)' }}
+    >
+      <div className="reveal max-h-full w-full max-w-md overflow-y-auto rounded-3xl bg-card p-5 shadow-lift">
         <p className="font-bold">Sửa câu này</p>
         <p className="mt-1 text-xs leading-relaxed text-muted">
           Hay gặp với câu tách từ ảnh: chữ đọc sai, hoặc ghép nhầm cặp.

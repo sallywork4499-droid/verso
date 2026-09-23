@@ -88,5 +88,17 @@ check('Sau khi đổi: không còn câu nào của A', replaced.every((c) => c.p
 check('Còn trong cùng lựa chọn thì vẫn nối để giữ câu chờ sửa',
   mergeQueue(queue, [card('a9', 'A', 'phrase')]).some((c) => c.id === 'a1'));
 
+
+console.log('\n── Kho lớn hơn trần một lô ──');
+// 30 câu; những câu vừa dịch đúng có hạn ôn đẩy sang mai nên rơi xuống cuối
+const big: Card[] = Array.from({ length: 30 }, (_, i) =>
+  card(`b${i}`, 'A', 'sentence', i < 12 ? future : past, i)
+);
+const doneSet = new Set(big.filter((c) => c.next_due_at === future).map((c) => c.id));
+const lo = pickBatch(big, doneSet, 10, NOW);
+check('Không bốc lại câu đã đúng hôm nay', lo.every((c) => !doneSet.has(c.id)), `${lo.length} câu`);
+check('Lấy đủ một lô khi kho còn nhiều', lo.length === 10);
+check('Làm hết thì trả rỗng để báo xong', pickBatch(big, new Set(big.map((c) => c.id)), 10, NOW).length === 0);
+
 console.log(`\n${fails === 0 ? 'Tất cả đều đạt.' : `${fails} chỗ sai.`}\n`);
 process.exit(fails === 0 ? 0 : 1);

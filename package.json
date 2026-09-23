@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "tsx tests/session.test.ts && tsx tests/passage.test.ts && tsx tests/glossary.test.ts && tsx tests/ai.test.ts && tsx tests/fallback.test.ts && tsx tests/config.test.ts && tsx tests/auth.test.ts && tsx tests/contrast.test.ts"
+    "test": "tsx tests/session.test.ts && tsx tests/passage.test.ts && tsx tests/font.test.ts && tsx tests/glossary.test.ts && tsx tests/ai.test.ts && tsx tests/fallback.test.ts && tsx tests/config.test.ts && tsx tests/auth.test.ts && tsx tests/contrast.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.1",

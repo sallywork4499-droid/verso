@@ -4,8 +4,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { DIFFICULTY_LABEL } from '@/lib/scoring';
+import useViewportFit from '@/lib/useViewportFit';
 import {
   ALL_LEVELS,
+  ANSWER_MIN_ROWS,
+  promptFont,
   afterCorrect,
   afterWrong,
   dateKey,
@@ -104,7 +107,11 @@ export default function Practice({
   const [fixVi, setFixVi] = useState('');
   const [fixEn, setFixEn] = useState('');
 
+  const [peeking, setPeeking] = useState(false);
+  const [judging, setJudging] = useState(false);
+
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const promptRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const dirty = useRef(false); // có câu vừa chấm thì trang Tiến độ đang giữ đã cũ
   const retried = useRef<Set<string>>(new Set()); // câu đã từng sai trong lựa chọn này
@@ -115,6 +122,24 @@ export default function Practice({
   const card = queue[0] ?? null;
   const firstTry = card ? !retried.current.has(card.id) : true;
   const prog = progressOf(done, total);
+
+  // Bố cục bám theo vùng màn hình còn thấy, để bàn phím không che mất đề bài
+  useViewportFit();
+
+  /** Ô nhập cao dần theo lượng chữ, thay vì chiếm sẵn nhiều dòng. */
+  useEffect(() => {
+    const ta = inputRef.current;
+    if (!ta || phase !== 'writing') return;
+    ta.style.height = 'auto';
+    const cap = Math.max(96, Math.round(window.innerHeight * 0.38));
+    ta.style.height = `${Math.min(ta.scrollHeight, cap)}px`;
+  }, [answer, phase, card?.id]);
+
+  // Câu mới thì cuộn đề bài về đầu, khỏi còn dính chỗ đọc dở của câu trước
+  useEffect(() => {
+    promptRef.current?.scrollTo({ top: 0 });
+    setPeeking(false);
+  }, [card?.id]);
 
   useEffect(() => {
     queueRef.current = queue;
@@ -146,7 +171,7 @@ export default function Practice({
         const incoming: Card[] = data.cards ?? [];
         setTotal(typeof data.total === 'number' ? data.total : 0);
         setQueue((cur) => (mode === 'replace' ? incoming : mergeQueue(cur, incoming)));
-        if (mode === 'replace') setEmptyReason(incoming.length === 0 ? data.reason : null);
+        setEmptyReason(incoming.length === 0 ? data.reason : null);
       } catch {
         if (keyRef.current === forKey && queueRef.current.length === 0) setEmptyReason('offline');
       } finally {
@@ -331,7 +356,9 @@ export default function Practice({
 
   /* ---------- người dùng tự phán đúng/sai ---------- */
   async function judge(correct: boolean) {
-    if (!card) return;
+    // Bấm nhanh hai lần thì lần sau bị bỏ qua, tránh ghi trùng một bài làm
+    if (!card || judging) return;
+    setJudging(true);
     const nextCombo = correct ? combo + 1 : 0;
 
     const res = await fetch('/api/attempt', {
@@ -374,6 +401,8 @@ export default function Practice({
     setCombo(nextCombo);
     dirty.current = true;
     localStorage.removeItem(DRAFT_KEY);
+
+    setJudging(false);
 
     if (correct) {
       retried.current.delete(card.id);
@@ -443,7 +472,13 @@ export default function Practice({
   const finished = !loading && !card && prog.finished;
 
   return (
-    <div className="flex min-h-[100dvh] flex-col">
+    <div
+      className="fixed inset-x-0 mx-auto flex w-full max-w-lg flex-col overflow-hidden"
+      style={{
+        top: 'var(--app-top, 0px)',
+        height: 'var(--app-h, 100dvh)',
+      }}
+    >
       <StatusBar
         streak={streak}
         points={points}
@@ -451,12 +486,12 @@ export default function Practice({
         done={doneThisSession}
         doneToday={doneToday}
         goal={profile.daily_goal}
-        onOpenDashboard={(e) => {
+        onNavigate={(e, to) => {
           if (!dirty.current) return; // chưa đổi gì: dùng bản đang giữ, hiện ngay
           e.preventDefault();
           dirty.current = false;
           router.refresh(); // xoá bản cũ trong bộ nhớ trước khi sang
-          router.push('/dashboard');
+          router.push(to);
         }}
       />
 
@@ -509,7 +544,11 @@ export default function Practice({
         })}
       </div>
 
-      <main className="flex flex-1 flex-col px-4 pb-4">
+      <main
+        className={`flex min-h-0 flex-1 flex-col px-4 pb-4 ${
+          phase === 'revealed' ? 'overflow-y-auto' : ''
+        }`}
+      >
         {loading ? (
           <Centered>Đang lấy câu…</Centered>
         ) : finished ? (
@@ -521,43 +560,57 @@ export default function Practice({
             onPick={() => setPicking(true)}
           />
         ) : !card ? (
-          <EmptyState reason={emptyReason} levels={levels} onPick={() => setPicking(true)} />
+          <EmptyState
+            reason={emptyReason}
+            levels={levels}
+            remaining={prog.total - prog.done}
+            onPick={() => setPicking(true)}
+            onLoadMore={() => refill('replace')}
+          />
         ) : (
           <>
-            <div className="flex flex-1 flex-col justify-center py-4">
-              <p
-                className={`text-ink ${
-                  card.difficulty === 'paragraph' ? 'text-promptSm' : 'text-prompt'
-                }`}
-              >
+            <div
+              ref={promptRef}
+              aria-live="polite"
+              className="min-h-0 flex-1 overflow-y-auto overscroll-contain py-3"
+            >
+              <p className="text-ink" style={promptStyle(card.vi_text)}>
                 {card.vi_text}
               </p>
               <button
                 onClick={openFix}
-                className="mt-3 self-start text-xs font-semibold text-muted hover:text-ink"
+                className="mt-3 text-xs font-semibold text-muted hover:text-ink"
               >
                 Câu này có vấn đề?
               </button>
             </div>
 
             {phase === 'writing' ? (
-              <div className="space-y-3">
+              <div className="flex-none pt-2">
                 <textarea
                   ref={inputRef}
                   value={answer}
                   onChange={(e) => setAnswer(e.target.value)}
                   placeholder="Viết lại bằng tiếng Anh…"
-                  rows={card.difficulty === 'paragraph' ? 6 : 3}
+                  rows={ANSWER_MIN_ROWS}
                   autoFocus
-                  className="w-full resize-none rounded-2xl bg-card p-4 leading-relaxed text-ink shadow-card placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-brand/60"
+                  className="block w-full resize-none overflow-y-auto rounded-2xl bg-card p-4 leading-relaxed text-ink shadow-card placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-brand/60"
                 />
                 <button
                   onClick={check}
                   disabled={!answer.trim()}
-                  className="w-full rounded-2xl bg-brand py-3.5 font-semibold text-onBrand shadow-brand transition-opacity disabled:opacity-30 disabled:shadow-none"
+                  className="mt-2.5 w-full rounded-2xl bg-brand py-3.5 font-semibold text-onBrand shadow-brand transition-opacity disabled:opacity-30 disabled:shadow-none"
                 >
                   Kiểm tra
                 </button>
+                {isLong(card.vi_text) && (
+                  <button
+                    onClick={() => setPeeking(true)}
+                    className="mx-auto mt-2 block text-sm font-semibold text-brandDeep"
+                  >
+                    Xem lại cả đoạn
+                  </button>
+                )}
               </div>
             ) : (
               <Review
@@ -568,6 +621,7 @@ export default function Practice({
                 gradeError={gradeError}
                 onCorrect={() => judge(true)}
                 onWrong={() => judge(false)}
+                busy={judging}
                 onRetry={retry}
                 onRegrade={runGrade}
               />
@@ -576,6 +630,9 @@ export default function Practice({
         )}
       </main>
 
+      {peeking && card && (
+        <PeekSheet text={card.vi_text} onClose={() => setPeeking(false)} inputRef={inputRef} />
+      )}
       {picking && (
         <PassagePicker pages={pages} onApply={applySelection} onClose={() => setPicking(false)} />
       )}
@@ -592,6 +649,55 @@ export default function Practice({
       )}
       {goalHit && <GoalToast goal={profile.daily_goal} />}
       {badge && <BadgeToast badgeKey={badge} />}
+    </div>
+  );
+}
+
+/** Đề bài dài tới mức đọc xong không nhớ hết thì mới cần nút xem lại. */
+function isLong(text: string) {
+  return text.trim().length > 140;
+}
+
+function promptStyle(text: string) {
+  const f = promptFont(text);
+  return { fontSize: `${f.size}px`, lineHeight: f.lineHeight, letterSpacing: '-0.01em' };
+}
+
+/**
+ * Trượt đoạn văn lên che tạm ô nhập để đọc lại.
+ * Đóng lại thì con trỏ về đúng cuối chữ đang gõ dở.
+ */
+function PeekSheet({
+  text,
+  onClose,
+  inputRef,
+}: {
+  text: string;
+  onClose: () => void;
+  inputRef: React.RefObject<HTMLTextAreaElement>;
+}) {
+  return (
+    <div className="absolute inset-x-0 bottom-0 top-24 z-20 flex flex-col rounded-t-3xl bg-card p-4 shadow-lift">
+      <p className="mb-2 flex-none text-xs font-semibold text-muted">Đoạn cần dịch</p>
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        <p className="text-ink" style={promptStyle(text)}>
+          {text}
+        </p>
+      </div>
+      <button
+        onClick={() => {
+          onClose();
+          requestAnimationFrame(() => {
+            const ta = inputRef.current;
+            if (!ta) return;
+            ta.focus();
+            ta.setSelectionRange(ta.value.length, ta.value.length);
+          });
+        }}
+        className="mt-3 w-full flex-none rounded-2xl bg-sand py-3 font-semibold text-muted"
+      >
+        Đóng, viết tiếp
+      </button>
     </div>
   );
 }
@@ -648,14 +754,39 @@ function FinishedState({
 function EmptyState({
   reason,
   levels,
+  remaining,
   onPick,
+  onLoadMore,
 }: {
   reason: string | null;
   levels: Difficulty[];
+  remaining: number;
   onPick: () => void;
+  onLoadMore: () => void;
 }) {
   if (reason === 'offline') {
     return <Centered>Mất mạng rồi. Thử lại khi có sóng nhé.</Centered>;
+  }
+
+  // Kho rất lớn: lấy hết một lô mà vẫn còn câu chưa làm ở phần chưa lấy về
+  if (reason === 'batch_empty' || remaining > 0) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-5 px-6 text-center">
+        <Mascot size={110} />
+        <p className="max-w-xs leading-relaxed text-muted">
+          Hết câu trong lượt này. Lựa chọn hiện tại còn {remaining} mục chưa dịch đúng.
+        </p>
+        <button
+          onClick={onLoadMore}
+          className="rounded-2xl bg-brand px-6 py-3 font-semibold text-onBrand shadow-brand"
+        >
+          Tải thêm câu
+        </button>
+        <button onClick={onPick} className="text-sm font-semibold text-muted hover:text-ink">
+          Chọn đoạn khác
+        </button>
+      </div>
+    );
   }
 
   if (reason === 'no_selection') {

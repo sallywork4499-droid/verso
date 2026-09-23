@@ -118,3 +118,20 @@ export function pickBatch(
     .sort((a, b) => a.times_seen - b.times_seen);
   return [...due, ...rest].slice(0, size);
 }
+
+/**
+ * Cỡ chữ cho đề bài, co theo độ dài.
+ * Đoạn ngắn thì chữ to cho dễ đọc; đoạn dài thì nhỏ lại để lọt nhiều dòng hơn
+ * trong khoảng màn hình còn trống phía trên bàn phím.
+ */
+export function promptFont(text: string): { size: number; lineHeight: number } {
+  const n = text.trim().length;
+  if (n <= 60) return { size: 26, lineHeight: 1.45 };
+  if (n <= 140) return { size: 22, lineHeight: 1.5 };
+  if (n <= 300) return { size: 19, lineHeight: 1.55 };
+  if (n <= 600) return { size: 17, lineHeight: 1.6 };
+  return { size: 16, lineHeight: 1.62 };
+}
+
+/** Số dòng khởi điểm của ô nhập: bắt đầu nhỏ rồi tự cao dần theo lượng chữ. */
+export const ANSWER_MIN_ROWS = 2;

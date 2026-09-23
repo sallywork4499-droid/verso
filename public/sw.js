@@ -3,7 +3,7 @@
  * Mục đích duy nhất: mở app lúc mất mạng vẫn thấy màn hình luyện
  * thay vì trang lỗi của trình duyệt. Hàng đợi câu đã nằm sẵn trong localStorage.
  */
-const CACHE = 'verso-v1';
+const CACHE = 'verso-v2';
 const SHELL = ['/', '/manifest.json', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', (e) => {
@@ -30,7 +30,9 @@ self.addEventListener('fetch', (e) => {
   // Dữ liệu và xác thực luôn phải lấy mới, không được trả bản cũ
   if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/auth/')) return;
 
-  // Trang: ưu tiên mạng, mất mạng thì lấy bản đã lưu
+  // Trang: ưu tiên mạng, mất mạng thì lấy bản đã lưu để app vẫn mở được.
+  // Bản lưu này có nội dung của người đang đăng nhập, nên lúc đăng xuất
+  // app xoá sạch toàn bộ cache (xem SignOut.tsx).
   if (request.mode === 'navigate') {
     e.respondWith(
       fetch(request)
