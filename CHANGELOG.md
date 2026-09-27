@@ -1,5 +1,27 @@
 # Nhật ký phiên bản
 
+## v2.11 — Nhường chỗ cho đoạn văn khi gõ
+
+**Vấn đề.** v2.9 đã làm bố cục bám đúng vùng màn hình còn thấy, nhưng vẫn giữ nguyên mọi thanh phía trên. Trên iPhone khi bàn phím mở, vùng còn thấy chỉ khoảng 460 điểm ảnh, mà thanh điểm, nút chọn đoạn, ba nút chọn mức, hai dòng phụ, ô nhập và nút Kiểm tra đã ăn hết chừng 408. Đoạn văn còn lại hai dòng.
+
+**Thu gọn phần đầu khi đang gõ.** Chạm vào ô viết và bàn phím mở lên thì thanh điểm, nút chọn đoạn và ba nút chọn mức ẩn đi, thay bằng một dải mỏng cao 28 điểm ảnh chỉ còn tiến độ và tên đoạn. Đóng bàn phím là mọi thứ hiện lại nguyên vẹn.
+
+**Gom hai nút phụ vào dải mỏng.** "Xem lại cả đoạn" thành nút ⤢ và "Câu này có vấn đề?" thành nút ⚠, thay vì chiếm hai dòng riêng.
+
+**Chặn ô nhập thấp hơn khi đang gõ,** ba phần mười vùng còn thấy thay vì gần bốn phần mười, và tính theo vùng còn thấy chứ không theo chiều cao cửa sổ. Viết dài mấy thì đoạn văn vẫn giữ được phần lớn chỗ.
+
+Cộng lại, đoạn văn có khoảng 208 điểm ảnh thay vì 52, tức bảy tám dòng thay vì hai.
+
+**Nhận biết bàn phím** bằng cách so chiều cao vùng còn thấy với chiều cao lớn nhất từng đo được. Xoay ngang dọc thì mốc cũ không còn đúng nên app đo lại từ đầu.
+
+### Đánh đổi
+
+Trong lúc bàn phím mở, không bấm được nút chọn đoạn, chọn mức, Thư viện hay Tiến độ. Đóng bàn phím là chúng hiện lại. Đang gõ dở thì hiếm khi cần đổi đoạn, nên đổi lấy chỗ cho đoạn văn là đáng.
+
+### Cập nhật
+
+Không đụng database, không có file SQL nào. Ba file thay đổi: `Practice.tsx`, `PracticeParts.tsx`, `useViewportFit.ts`. Giữ nguyên phiên bản service worker và mọi khoá lưu trên máy, nên lịch sử dùng app và tiến độ trong ngày không mất.
+
 ## v2.10 — Rà soát: năm lỗi
 
 Rà lại toàn bộ mã nguồn sau v2.9.1. Không thêm tính năng, chỉ sửa.

@@ -27,6 +27,7 @@ import {
   FixSheet,
   GoalToast,
   Review,
+  SlimBar,
   StatusBar,
 } from '@/components/PracticeParts';
 import type { Card, Difficulty, Feedback, Profile } from '@/lib/types';
@@ -109,6 +110,7 @@ export default function Practice({
 
   const [peeking, setPeeking] = useState(false);
   const [judging, setJudging] = useState(false);
+  const [typing, setTyping] = useState(false);
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const promptRef = useRef<HTMLDivElement>(null);
@@ -119,21 +121,29 @@ export default function Practice({
   const doneRef = useRef<Set<string>>(new Set());
   const keyRef = useRef(selKey); // lựa chọn mà lời gọi mạng đang phục vụ
 
+  // Bố cục bám theo vùng màn hình còn thấy, để bàn phím không che mất đề bài
+  const { height: viewportH, keyboardOpen } = useViewportFit();
+
   const card = queue[0] ?? null;
   const firstTry = card ? !retried.current.has(card.id) : true;
   const prog = progressOf(done, total);
 
-  // Bố cục bám theo vùng màn hình còn thấy, để bàn phím không che mất đề bài
-  useViewportFit();
+  /**
+   * Đang gõ và bàn phím đã mở: thu gọn phần đầu để nhường chỗ cho đoạn văn.
+   * Bàn phím đóng là mọi thứ hiện lại nguyên vẹn.
+   */
+  const compact = typing && keyboardOpen && phase === 'writing';
 
   /** Ô nhập cao dần theo lượng chữ, thay vì chiếm sẵn nhiều dòng. */
   useEffect(() => {
     const ta = inputRef.current;
     if (!ta || phase !== 'writing') return;
     ta.style.height = 'auto';
-    const cap = Math.max(96, Math.round(window.innerHeight * 0.38));
+    const vh = viewportH || window.innerHeight;
+    // Đang gõ thì chặn thấp hơn, để viết dài mấy đoạn văn vẫn giữ được phần lớn chỗ
+    const cap = Math.max(88, Math.round(vh * (compact ? 0.3 : 0.38)));
     ta.style.height = `${Math.min(ta.scrollHeight, cap)}px`;
-  }, [answer, phase, card?.id]);
+  }, [answer, phase, card?.id, viewportH, compact]);
 
   // Câu mới thì cuộn đề bài về đầu, khỏi còn dính chỗ đọc dở của câu trước
   useEffect(() => {
@@ -479,70 +489,82 @@ export default function Practice({
         height: 'var(--app-h, 100dvh)',
       }}
     >
-      <StatusBar
-        streak={streak}
-        points={points}
-        gained={gained}
-        done={doneThisSession}
-        doneToday={doneToday}
-        goal={profile.daily_goal}
-        onNavigate={(e, to) => {
-          if (!dirty.current) return; // chưa đổi gì: dùng bản đang giữ, hiện ngay
-          e.preventDefault();
-          dirty.current = false;
-          router.refresh(); // xoá bản cũ trong bộ nhớ trước khi sang
-          router.push(to);
-        }}
-      />
+      {compact ? (
+        <SlimBar
+          doneCount={prog.done}
+          total={prog.total}
+          passage={selectionLabel(selected, pages.length)}
+          onPeek={card && isLong(card.vi_text) ? () => setPeeking(true) : null}
+          onIssue={openFix}
+        />
+      ) : (
+        <>
+          <StatusBar
+            streak={streak}
+            points={points}
+            gained={gained}
+            done={doneThisSession}
+            doneToday={doneToday}
+            goal={profile.daily_goal}
+            onNavigate={(e, to) => {
+              if (!dirty.current) return; // chưa đổi gì: dùng bản đang giữ, hiện ngay
+              e.preventDefault();
+              dirty.current = false;
+              router.refresh(); // xoá bản cũ trong bộ nhớ trước khi sang
+              router.push(to);
+            }}
+          />
 
-      {/* Đang luyện đoạn nào, và tiến độ của lựa chọn đó */}
-      <div className="flex items-center gap-3 px-4 pt-2">
-        <button
-          onClick={() => setPicking(true)}
-          disabled={applying}
-          className="flex min-w-0 items-center gap-2 rounded-2xl bg-card px-3.5 py-2 shadow-card disabled:opacity-50"
-        >
-          <span aria-hidden>📖</span>
-          <span className="truncate text-sm font-semibold">
-            {applying ? 'Đang đổi…' : selectionLabel(selected, pages.length)}
-          </span>
-          <span className="text-xs text-muted" aria-hidden>
-            ▾
-          </span>
-        </button>
-        {total > 0 && (
-          <div className="ml-auto flex shrink-0 items-center gap-2">
-            <div className="h-1.5 w-16 overflow-hidden rounded-full bg-sand">
-              <div
-                className="h-full rounded-full bg-brand transition-[width] duration-500"
-                style={{ width: `${prog.pct}%` }}
-              />
-            </div>
-            <span className="text-xs font-semibold text-muted">
-              {prog.done}/{prog.total}
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* Mức: bật tắt tự do, chọn nhiều được */}
-      <div className="flex gap-1.5 px-4 pb-3 pt-3">
-        {ALL_LEVELS.map((l) => {
-          const on = levels.includes(l);
-          return (
+          {/* Đang luyện đoạn nào, và tiến độ của lựa chọn đó */}
+          <div className="flex items-center gap-3 px-4 pt-2">
             <button
-              key={l}
-              onClick={() => toggleLevel(l)}
-              aria-pressed={on}
-              className={`flex-1 rounded-xl py-2 text-sm font-semibold transition-colors ${
-                on ? 'bg-card text-brand shadow-card' : 'bg-sand/60 text-muted hover:text-ink'
-              }`}
+              onClick={() => setPicking(true)}
+              disabled={applying}
+              className="flex min-w-0 items-center gap-2 rounded-2xl bg-card px-3.5 py-2 shadow-card disabled:opacity-50"
             >
-              {DIFFICULTY_LABEL[l]}
+              <span aria-hidden>📖</span>
+              <span className="truncate text-sm font-semibold">
+                {applying ? 'Đang đổi…' : selectionLabel(selected, pages.length)}
+              </span>
+              <span className="text-xs text-muted" aria-hidden>
+                ▾
+              </span>
             </button>
-          );
-        })}
-      </div>
+            {total > 0 && (
+              <div className="ml-auto flex shrink-0 items-center gap-2">
+                <div className="h-1.5 w-16 overflow-hidden rounded-full bg-sand">
+                  <div
+                    className="h-full rounded-full bg-brand transition-[width] duration-500"
+                    style={{ width: `${prog.pct}%` }}
+                  />
+                </div>
+                <span className="text-xs font-semibold text-muted">
+                  {prog.done}/{prog.total}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Mức: bật tắt tự do, chọn nhiều được */}
+          <div className="flex gap-1.5 px-4 pb-3 pt-3">
+            {ALL_LEVELS.map((l) => {
+              const on = levels.includes(l);
+              return (
+                <button
+                  key={l}
+                  onClick={() => toggleLevel(l)}
+                  aria-pressed={on}
+                  className={`flex-1 rounded-xl py-2 text-sm font-semibold transition-colors ${
+                    on ? 'bg-card text-brand shadow-card' : 'bg-sand/60 text-muted hover:text-ink'
+                  }`}
+                >
+                  {DIFFICULTY_LABEL[l]}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
 
       <main
         className={`flex min-h-0 flex-1 flex-col px-4 pb-4 ${
@@ -577,12 +599,14 @@ export default function Practice({
               <p className="text-ink" style={promptStyle(card.vi_text)}>
                 {card.vi_text}
               </p>
-              <button
-                onClick={openFix}
-                className="mt-3 text-xs font-semibold text-muted hover:text-ink"
-              >
-                Câu này có vấn đề?
-              </button>
+              {!compact && (
+                <button
+                  onClick={openFix}
+                  className="mt-3 text-xs font-semibold text-muted hover:text-ink"
+                >
+                  Câu này có vấn đề?
+                </button>
+              )}
             </div>
 
             {phase === 'writing' ? (
@@ -591,6 +615,8 @@ export default function Practice({
                   ref={inputRef}
                   value={answer}
                   onChange={(e) => setAnswer(e.target.value)}
+                  onFocus={() => setTyping(true)}
+                  onBlur={() => setTyping(false)}
                   placeholder="Viết lại bằng tiếng Anh…"
                   rows={ANSWER_MIN_ROWS}
                   autoFocus
@@ -603,7 +629,7 @@ export default function Practice({
                 >
                   Kiểm tra
                 </button>
-                {isLong(card.vi_text) && (
+                {!compact && isLong(card.vi_text) && (
                   <button
                     onClick={() => setPeeking(true)}
                     className="mx-auto mt-2 block text-sm font-semibold text-brandDeep"

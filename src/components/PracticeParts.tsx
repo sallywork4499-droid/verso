@@ -277,3 +277,51 @@ export function BadgeToast({ badgeKey }: { badgeKey: string }) {
     </div>
   );
 }
+
+/**
+ * Dải mỏng thay cho toàn bộ phần đầu khi bàn phím đang mở.
+ * Chỉ giữ những gì cần liếc mắt: tiến độ và tên đoạn; hai nút thu thành biểu tượng.
+ * Mục đích duy nhất là nhường chỗ cho đoạn văn.
+ */
+export function SlimBar({
+  doneCount,
+  total,
+  passage,
+  onPeek,
+  onIssue,
+}: {
+  doneCount: number;
+  total: number;
+  passage: string;
+  onPeek: (() => void) | null;
+  onIssue: () => void;
+}) {
+  return (
+    <div className="flex h-7 flex-none items-center gap-2 px-4 text-xs text-muted">
+      {total > 0 && (
+        <span className="font-extrabold text-brandDeep">
+          {doneCount}/{total}
+        </span>
+      )}
+      <span className="min-w-0 truncate">{passage}</span>
+      <span className="ml-auto flex flex-none gap-1.5">
+        {onPeek && (
+          <button
+            onClick={onPeek}
+            aria-label="Xem lại cả đoạn"
+            className="rounded-full bg-card px-2.5 py-0.5 text-xs font-extrabold text-brandDeep shadow-card"
+          >
+            ⤢ Đoạn
+          </button>
+        )}
+        <button
+          onClick={onIssue}
+          aria-label="Câu này có vấn đề"
+          className="rounded-full bg-card px-2.5 py-0.5 text-xs font-extrabold text-muted shadow-card"
+        >
+          ⚠
+        </button>
+      </span>
+    </div>
+  );
+}
