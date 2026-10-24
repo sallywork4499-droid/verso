@@ -12,7 +12,7 @@ export default function Setup({
   searchParams: { reason?: string };
 }) {
   return (
-    <main className="mx-auto flex min-h-[100dvh] max-w-md flex-col justify-center px-6 py-10">
+    <main className="mx-auto flex min-h-[100dvh] max-w-md flex-col justify-center px-6 pt-[calc(2.5rem+env(safe-area-inset-top))] pb-[calc(2.5rem+env(safe-area-inset-bottom))]">
       <h1 className="text-3xl font-bold">Chưa cấu hình xong</h1>
 
       {searchParams.reason && (

@@ -6,8 +6,8 @@ export type { Part, Provider, Task } from './types';
 
 /**
  * Danh sách model thử lần lượt. Đặt model mới trước, model cũ sau làm lưới an toàn.
- * Google đổi tên và khai tử model khá thường xuyên: dòng 2.5 ngừng hoạt động
- * từ tháng 10/2026, nên để một mình nó là app sẽ chết.
+ * Google đổi tên và khai tử model khá thường xuyên, và dòng 2.5 chỉ còn mở cho
+ * tài khoản đã dùng trước đó, nên để một mình nó là app sẽ chết.
  */
 const GEMINI_MODELS = {
   // Đọc chữ từ ảnh cần model khoẻ hơn
@@ -18,8 +18,9 @@ const GEMINI_MODELS = {
     'gemini-2.5-flash',
   ],
   // Chấm một câu dịch thì model nhẹ là đủ, lại tốn ít hạn mức hơn
+  // (v2.13) Bỏ 'gemini-3.6-flash-lite': Google không có model này, lần nào cũng thử hụt một lượt.
   grade: [
-    'gemini-3.6-flash-lite',
+    'gemini-3.5-flash-lite',
     'gemini-3.6-flash',
     'gemini-3.8-flash',
     'gemini-2.5-flash-lite',

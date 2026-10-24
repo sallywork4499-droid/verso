@@ -62,7 +62,7 @@ export default function Reset() {
   }
 
   return (
-    <main className="flex min-h-[100dvh] flex-col justify-center px-6 py-10">
+    <main className="flex min-h-[100dvh] flex-col justify-center px-6 pt-[calc(2.5rem+env(safe-area-inset-top))] pb-[calc(2.5rem+env(safe-area-inset-bottom))]">
       <div className="mx-auto w-full max-w-sm">
         <div className="flex justify-center">
           <Mascot size={104} mood={stage === 'done' ? 'cheer' : 'happy'} />

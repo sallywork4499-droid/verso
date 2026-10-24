@@ -12,6 +12,8 @@ import {
   afterCorrect,
   afterWrong,
   dateKey,
+  displayStreak,
+  keepHead,
   mergeQueue,
   normalizeLevels,
   progressOf,
@@ -26,6 +28,7 @@ import {
   Centered,
   FixSheet,
   GoalToast,
+  NoticeToast,
   Review,
   SlimBar,
   StatusBar,
@@ -94,7 +97,10 @@ export default function Practice({
   const [goalHit, setGoalHit] = useState(false);
   const [combo, setCombo] = useState(0);
   const [points, setPoints] = useState(profile.total_points);
-  const [streak, setStreak] = useState(profile.current_streak);
+  // Bỏ lỡ một ngày thì hiện 0 ngay, không đợi tới câu làm đúng kế tiếp (chỉ đổi cách hiển thị)
+  const [streak, setStreak] = useState(() =>
+    displayStreak(profile.current_streak, profile.last_active_date, dateKey(new Date(), profile.timezone))
+  );
   const [gained, setGained] = useState<number | null>(null);
   const [badge, setBadge] = useState<string | null>(null);
 
@@ -110,6 +116,8 @@ export default function Practice({
 
   const [peeking, setPeeking] = useState(false);
   const [judging, setJudging] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [typing, setTyping] = useState(false);
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -120,6 +128,16 @@ export default function Practice({
   const queueRef = useRef<Card[]>([]);
   const doneRef = useRef<Set<string>>(new Set());
   const keyRef = useRef(selKey); // lựa chọn mà lời gọi mạng đang phục vụ
+  const gradeSeq = useRef(0); // lượt chấm hiện hành; kết quả của lượt cũ về muộn thì bỏ
+  const answerRef = useRef('');
+  const phaseRef = useRef<Phase>('writing');
+  const noticeTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  function showNotice(text: string) {
+    setNotice(text);
+    clearTimeout(noticeTimer.current);
+    noticeTimer.current = setTimeout(() => setNotice(null), 4500);
+  }
 
   // Bố cục bám theo vùng màn hình còn thấy, để bàn phím không che mất đề bài
   const { height: viewportH, keyboardOpen } = useViewportFit();
@@ -157,6 +175,10 @@ export default function Practice({
   useEffect(() => {
     doneRef.current = done;
   }, [done]);
+  useEffect(() => {
+    answerRef.current = answer;
+    phaseRef.current = phase;
+  }, [answer, phase]);
 
   /* ---------- nạp câu ---------- */
   const refill = useCallback(
@@ -173,15 +195,35 @@ export default function Practice({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ levels, exclude }),
         });
-        const data = await res.json();
+
+        // Hết phiên đăng nhập: đưa về trang đăng nhập, bản nháp vẫn nằm trên máy
+        if (res.status === 401) {
+          window.location.href = '/login';
+          return;
+        }
+        const data = await res.json().catch(() => null);
 
         // Người dùng đã đổi lựa chọn trong lúc chờ: bỏ kết quả cũ, không để lẫn vào
         if (keyRef.current !== forKey) return;
 
-        const incoming: Card[] = data.cards ?? [];
+        // Server lỗi: không được coi là "thư viện trống". Đang có câu thì cứ học tiếp.
+        if (!res.ok || !data) {
+          if (queueRef.current.length === 0) setEmptyReason('error');
+          return;
+        }
+
+        // Câu vừa làm đúng trong lúc chờ lô này về thì không cho quay lại
+        const incoming: Card[] = ((data.cards ?? []) as Card[]).filter(
+          (c) => !doneRef.current.has(c.id)
+        );
         setTotal(typeof data.total === 'number' ? data.total : 0);
-        setQueue((cur) => (mode === 'replace' ? incoming : mergeQueue(cur, incoming)));
-        setEmptyReason(incoming.length === 0 ? data.reason : null);
+        setQueue((cur) =>
+          mode === 'replace'
+            ? // Câu đang hiện (lấy từ bộ nhớ máy) giữ nguyên, không tự đổi dưới mắt người dùng
+              keepHead(cur, incoming)
+            : mergeQueue(cur, incoming)
+        );
+        setEmptyReason(incoming.length === 0 && queueRef.current.length === 0 ? data.reason : null);
       } catch {
         if (keyRef.current === forKey && queueRef.current.length === 0) setEmptyReason('offline');
       } finally {
@@ -204,8 +246,8 @@ export default function Practice({
     setCombo(0);
     setAnswer('');
     setPhase('writing');
-    setFeedback(null);
-    setGradeError(null);
+    cancelGrade();
+    setSaveError(null);
 
     // Hàng đợi lưu trên máy chỉ dùng lại khi đúng lựa chọn này
     let fromCache: Card[] = [];
@@ -249,11 +291,23 @@ export default function Practice({
     const supabase = createClient();
     const on = ids;
     const off = pages.filter((p) => !want.has(p.id)).map((p) => p.id);
-    await Promise.all([
+    const results = await Promise.all([
       on.length ? supabase.from('pages').update({ is_default: true }).in('id', on) : null,
       off.length ? supabase.from('pages').update({ is_default: false }).in('id', off) : null,
     ]);
-    setPages((cur) => cur.map((p) => ({ ...p, is_default: want.has(p.id) })));
+    const failed = results.some((r) => r?.error);
+
+    if (failed) {
+      // Không giả vờ đã đổi: server bốc câu theo lựa chọn đã lưu, nên đọc lại cho khớp
+      const { data: fresh } = await supabase.from('pages').select('id,is_default');
+      if (fresh) {
+        const byId = new Map(fresh.map((r) => [r.id as string, r.is_default as boolean]));
+        setPages((cur) => cur.map((p) => ({ ...p, is_default: byId.get(p.id) ?? p.is_default })));
+      }
+      showNotice('Chưa đổi được đoạn. Kiểm tra mạng rồi thử lại nhé.');
+    } else {
+      setPages((cur) => cur.map((p) => ({ ...p, is_default: want.has(p.id) })));
+    }
     setApplying(false);
   }
 
@@ -303,6 +357,38 @@ export default function Practice({
     }
   }, [answer, card, phase]);
 
+  /* ---------- sang ngày mới khi app vẫn chạy nền ---------- */
+  useEffect(() => {
+    const tz = profile.timezone;
+    const openedOn = dateKey(new Date(), tz);
+    // (v2.13.1) Không xoá bất kỳ dữ liệu nào trên máy, kể cả tiến độ của ngày cũ.
+
+    // iPhone hay giữ app trong bộ nhớ qua đêm. Mở lại sang ngày mới thì tải lại
+    // để vòng mục tiêu, streak và tiến độ đoạn tính theo hôm nay. Bản nháp nằm trên máy, không mất.
+    const dayChanged = () => dateKey(new Date(), tz) !== openedOn;
+    const onShow = () => {
+      if (document.visibilityState === 'visible' && dayChanged()) window.location.reload();
+    };
+    // Để app mở qua nửa đêm: chỉ tải lại khi đang không viết dở
+    const timer = setInterval(() => {
+      if (
+        document.visibilityState === 'visible' &&
+        dayChanged() &&
+        phaseRef.current === 'writing' &&
+        !answerRef.current.trim()
+      ) {
+        window.location.reload();
+      }
+    }, 60_000);
+    document.addEventListener('visibilitychange', onShow);
+    window.addEventListener('pageshow', onShow);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', onShow);
+      window.removeEventListener('pageshow', onShow);
+    };
+  }, [profile.timezone]);
+
   /* ---------- đo thời gian và số lần mở app ---------- */
   useEffect(() => {
     // Chuyển qua lại giữa các trang trong app không tính là một lần mở mới
@@ -347,8 +433,11 @@ export default function Practice({
   /** Gọi chấm bài chạy nền. Tách riêng để nút Chấm lại dùng được. */
   function runGrade() {
     if (!card) return;
+    const seq = ++gradeSeq.current;
+    const stale = () => seq !== gradeSeq.current;
     setGrading(true);
     setGradeError(null);
+    setFeedback(null);
     fetch('/api/grade', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -359,9 +448,24 @@ export default function Practice({
         if (!r.ok) throw new Error(d?.error ?? 'Chưa chấm được lúc này');
         return d as Feedback;
       })
-      .then(setFeedback)
-      .catch((e) => setGradeError(e instanceof Error ? e.message : 'Chưa chấm được lúc này'))
-      .finally(() => setGrading(false));
+      // Kết quả về muộn của câu trước (hoặc lần viết trước) thì bỏ, không để lẫn sang câu này
+      .then((f) => {
+        if (!stale()) setFeedback(f);
+      })
+      .catch((e) => {
+        if (!stale()) setGradeError(e instanceof Error ? e.message : 'Chưa chấm được lúc này');
+      })
+      .finally(() => {
+        if (!stale()) setGrading(false);
+      });
+  }
+
+  /** Bỏ lượt chấm đang chạy (chuyển câu, hay viết lại). */
+  function cancelGrade() {
+    gradeSeq.current++;
+    setGrading(false);
+    setGradeError(null);
+    setFeedback(null);
   }
 
   /* ---------- người dùng tự phán đúng/sai ---------- */
@@ -369,8 +473,10 @@ export default function Practice({
     // Bấm nhanh hai lần thì lần sau bị bỏ qua, tránh ghi trùng một bài làm
     if (!card || judging) return;
     setJudging(true);
+    setSaveError(null);
     const nextCombo = correct ? combo + 1 : 0;
 
+    let status = 0;
     const res = await fetch('/api/attempt', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -383,12 +489,33 @@ export default function Practice({
         feedback,
       }),
     })
-      .then((r) => r.json())
+      .then(async (r) => {
+        status = r.status;
+        return r.ok ? r.json() : null;
+      })
       .catch(() => null);
 
-    if (res?.profile) {
+    // Câu đã bị xoá ở nơi khác: bỏ khỏi hàng đợi, sang câu kế
+    if (status === 404) {
+      setJudging(false);
+      setTotal((t) => Math.max(0, t - 1));
+      advance(queueRef.current.filter((c) => c.id !== card.id));
+      return;
+    }
+    if (status === 401) {
+      window.location.href = '/login';
+      return;
+    }
+    // Chưa lưu được: giữ nguyên câu này, không chuyển, để bấm lại. Không lưu thì không tính.
+    if (!res) {
+      setJudging(false);
+      setSaveError('Chưa lưu được kết quả, có thể do mạng. Bấm lại nút ở trên nhé.');
+      return;
+    }
+
+    if (res.profile) {
       setPoints(res.profile.total_points);
-      setStreak(res.profile.current_streak);
+      setStreak(displayStreak(res.profile.current_streak, res.profile.last_active_date, today));
     }
     if (typeof res?.doneToday === 'number') {
       const before = doneToday;
@@ -421,19 +548,19 @@ export default function Practice({
       doneRef.current = nextDone;
       setDone(nextDone);
       saveDone(today, selKey, nextDone);
-      advance(afterCorrect(queue));
+      advance(afterCorrect(queueRef.current));
     } else {
       // Câu sai quay lại sau vài câu khác, lặp đến khi dịch đúng
       retried.current.add(card.id);
-      advance(afterWrong(queue));
+      advance(afterWrong(queueRef.current));
     }
   }
 
   function advance(next: Card[]) {
+    cancelGrade();
+    setSaveError(null);
     setAnswer('');
     setPhase('writing');
-    setFeedback(null);
-    setGradeError(null);
     queueRef.current = next;
     setQueue(next);
     if (next.length < LOW_WATER) refill('append');
@@ -467,14 +594,15 @@ export default function Practice({
     setFixing(false);
     dirty.current = true;
     setTotal((t) => Math.max(0, t - 1));
-    advance(queue.filter((c) => c.id !== id));
+    advance(queueRef.current.filter((c) => c.id !== id));
     await createClient().from('cards').delete().eq('id', id);
   }
 
   function retry() {
     if (card) retried.current.add(card.id);
+    cancelGrade();
+    setSaveError(null);
     setPhase('writing');
-    setFeedback(null);
     requestAnimationFrame(() => inputRef.current?.focus());
   }
 
@@ -487,6 +615,10 @@ export default function Practice({
       style={{
         top: 'var(--app-top, 0px)',
         height: 'var(--app-h, 100dvh)',
+        // iPhone tai thỏ / Dynamic Island: chừa chỗ cho giờ, sóng, pin
+        paddingTop: 'env(safe-area-inset-top)',
+        // Vạch home ở đáy: chừa chỗ khi bàn phím đóng
+        paddingBottom: keyboardOpen ? 0 : 'max(0px, calc(env(safe-area-inset-bottom) - 8px))',
       }}
     >
       {compact ? (
@@ -587,7 +719,10 @@ export default function Practice({
             levels={levels}
             remaining={prog.total - prog.done}
             onPick={() => setPicking(true)}
-            onLoadMore={() => refill('replace')}
+            onLoadMore={() => {
+              setEmptyReason(null);
+              refill('replace');
+            }}
           />
         ) : (
           <>
@@ -648,6 +783,7 @@ export default function Practice({
                 onCorrect={() => judge(true)}
                 onWrong={() => judge(false)}
                 busy={judging}
+                saveError={saveError}
                 onRetry={retry}
                 onRegrade={runGrade}
               />
@@ -675,6 +811,7 @@ export default function Practice({
       )}
       {goalHit && <GoalToast goal={profile.daily_goal} />}
       {badge && <BadgeToast badgeKey={badge} />}
+      {notice && <NoticeToast text={notice} />}
     </div>
   );
 }
@@ -703,7 +840,7 @@ function PeekSheet({
   inputRef: React.RefObject<HTMLTextAreaElement>;
 }) {
   return (
-    <div className="absolute inset-x-0 bottom-0 top-24 z-20 flex flex-col rounded-t-3xl bg-card p-4 shadow-lift">
+    <div className="absolute inset-x-0 bottom-0 top-[max(6rem,calc(env(safe-area-inset-top)+2.5rem))] z-20 flex flex-col rounded-t-3xl bg-card p-4 shadow-lift">
       <p className="mb-2 flex-none text-xs font-semibold text-muted">Đoạn cần dịch</p>
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         <p className="text-ink" style={promptStyle(text)}>
@@ -790,8 +927,23 @@ function EmptyState({
   onPick: () => void;
   onLoadMore: () => void;
 }) {
-  if (reason === 'offline') {
-    return <Centered>Mất mạng rồi. Thử lại khi có sóng nhé.</Centered>;
+  if (reason === 'offline' || reason === 'error') {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-5 px-6 text-center">
+        <Mascot size={110} mood="sleepy" />
+        <p className="max-w-xs leading-relaxed text-muted">
+          {reason === 'offline'
+            ? 'Mất mạng rồi. Có sóng lại thì bấm thử lại nhé.'
+            : 'Chưa tải được câu lúc này. Dữ liệu của bạn vẫn còn nguyên, thử lại sau ít giây nhé.'}
+        </p>
+        <button
+          onClick={onLoadMore}
+          className="rounded-2xl bg-brand px-6 py-3 font-semibold text-onBrand shadow-brand"
+        >
+          Thử lại
+        </button>
+      </div>
+    );
   }
 
   // Kho rất lớn: lấy hết một lô mà vẫn còn câu chưa làm ở phần chưa lấy về

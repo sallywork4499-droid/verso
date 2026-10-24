@@ -63,6 +63,7 @@ export function Review({
   onRetry,
   onRegrade,
   busy,
+  saveError,
 }: {
   card: Card;
   answer: string;
@@ -74,6 +75,7 @@ export function Review({
   onRetry: () => void;
   onRegrade: () => void;
   busy: boolean;
+  saveError?: string | null;
 }) {
   return (
     <div className="reveal space-y-4">
@@ -90,19 +92,27 @@ export function Review({
       <div className="flex gap-2">
         <button
           onClick={onWrong}
-          className="flex-1 rounded-2xl border border-line py-3 text-muted hover:border-rose/50 hover:text-rose"
+          disabled={busy}
+          className="flex-1 rounded-2xl border border-line py-3 text-muted transition-opacity hover:border-rose/50 hover:text-rose disabled:opacity-40"
         >
           Chưa đúng
         </button>
         <button
           onClick={onCorrect}
-          className="flex-1 rounded-2xl bg-brand py-3 font-semibold text-onBrand shadow-brand"
+          disabled={busy}
+          className="flex-1 rounded-2xl bg-brand py-3 font-semibold text-onBrand shadow-brand transition-opacity disabled:opacity-40"
         >
-          Đúng rồi
+          {busy ? 'Đang lưu…' : 'Đúng rồi'}
         </button>
       </div>
 
-      <button onClick={onRetry} className="w-full py-1 text-sm text-muted hover:text-ink">
+      {saveError && (
+        <p role="alert" className="rounded-2xl bg-card p-3 text-center text-sm leading-relaxed text-rose shadow-card">
+          {saveError}
+        </p>
+      )}
+
+      <button onClick={onRetry} disabled={busy} className="w-full py-1 text-sm text-muted hover:text-ink disabled:opacity-40">
         Sửa lại câu này
       </button>
 
@@ -204,7 +214,12 @@ export function FixSheet({
   return (
     <div
       className="fixed inset-x-0 z-20 flex items-end justify-center bg-ink/40 p-3"
-      style={{ top: 'var(--app-top, 0px)', height: 'var(--app-h, 100dvh)' }}
+      style={{
+        top: 'var(--app-top, 0px)',
+        height: 'var(--app-h, 100dvh)',
+        paddingTop: 'calc(0.75rem + env(safe-area-inset-top))',
+        paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))',
+      }}
     >
       <div className="reveal max-h-full w-full max-w-md overflow-y-auto rounded-3xl bg-card p-5 shadow-lift">
         <p className="font-bold">Sửa câu này</p>
@@ -256,7 +271,7 @@ export function FixSheet({
 
 export function GoalToast({ goal }: { goal: number }) {
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-24 flex justify-center px-4">
+    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(6rem+env(safe-area-inset-bottom))] flex justify-center px-4">
       <div className="pop flex items-center gap-3 rounded-2xl bg-card px-5 py-3 shadow-lift">
         <Mascot size={36} mood="cheer" />
         <div>
@@ -270,7 +285,7 @@ export function GoalToast({ goal }: { goal: number }) {
 
 export function BadgeToast({ badgeKey }: { badgeKey: string }) {
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-24 flex justify-center px-4">
+    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(6rem+env(safe-area-inset-bottom))] flex justify-center px-4">
       <div className="reveal rounded-2xl border border-brand/40 bg-sand px-5 py-3 text-center">
         <p className="text-sm text-brand">Đạt mốc {badgeLabel(badgeKey)}</p>
       </div>
@@ -322,6 +337,17 @@ export function SlimBar({
           ⚠
         </button>
       </span>
+    </div>
+  );
+}
+
+/** Thông báo ngắn khi một thao tác chưa thành công (ví dụ đổi đoạn lúc mất mạng). */
+export function NoticeToast({ text }: { text: string }) {
+  return (
+    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-40 flex justify-center px-4">
+      <div role="status" className="reveal rounded-2xl bg-card px-5 py-3 text-center shadow-lift">
+        <p className="text-sm font-semibold text-rose">{text}</p>
+      </div>
     </div>
   );
 }

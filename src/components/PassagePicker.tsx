@@ -53,11 +53,15 @@ export default function PassagePicker({
   return (
     <div
       className="fixed inset-x-0 z-30 flex items-end justify-center bg-ink/40"
-      style={{ top: 'var(--app-top, 0px)', height: 'var(--app-h, 100dvh)' }}
+      style={{
+        top: 'var(--app-top, 0px)',
+        height: 'var(--app-h, 100dvh)',
+        paddingTop: 'env(safe-area-inset-top)',
+      }}
       onClick={onClose}
     >
       <div
-        className="reveal flex max-h-full w-full max-w-md flex-col overflow-hidden rounded-t-3xl bg-card shadow-lift"
+        className="reveal flex max-h-full w-full max-w-md flex-col overflow-hidden rounded-t-3xl bg-card pb-[env(safe-area-inset-bottom)] shadow-lift"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex-none px-5 pb-3 pt-5">

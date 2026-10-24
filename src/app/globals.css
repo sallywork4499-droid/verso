@@ -77,6 +77,12 @@
   }
 }
 
+html {
+  /* Nền dự phòng cho mọi chỗ trống, kể cả dải sát mép màn hình iPhone */
+  background-color: rgb(var(--c-page));
+  transition: background-color 0.2s ease;
+}
+
 html,
 body {
   height: 100%;
@@ -85,14 +91,28 @@ body {
 }
 
 body {
-  background: rgb(var(--c-page));
+  /* Trong suốt: màu nền nằm ở html, chuyển màu nằm ở body::before */
+  overscroll-behavior-y: none;
+}
+
+/*
+ * Lớp nền chuyển màu. Trước v2.12 dùng background-attachment: fixed trên body,
+ * nhưng trên iPhone đời mới vùng "fixed" hụt mất phần thanh trạng thái nên đáy
+ * màn hình bị một dải khác màu. Lớp riêng này phủ dài thêm đúng phần đó.
+ */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(100% + env(safe-area-inset-top) + env(safe-area-inset-bottom));
+  z-index: -1;
+  pointer-events: none;
   background-image:
     radial-gradient(120% 60% at 15% 0%, var(--g1) 0%, transparent 60%),
     radial-gradient(100% 55% at 100% 8%, var(--g2) 0%, transparent 55%),
     radial-gradient(120% 70% at 50% 100%, var(--g3) 0%, transparent 62%);
-  background-attachment: fixed;
-  overscroll-behavior-y: none;
-  transition: background-color 0.2s ease;
 }
 
 *:focus-visible {

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
 const CHOICES = [5, 10, 20, 30];
@@ -9,12 +10,23 @@ const CHOICES = [5, 10, 20, 30];
 export default function GoalPicker({ userId, goal }: { userId: string; goal: number }) {
   const [value, setValue] = useState(goal);
   const [saving, setSaving] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const router = useRouter();
 
   async function choose(next: number) {
+    const prev = value;
     setValue(next);
     setSaving(true);
-    await createClient().from('profiles').update({ daily_goal: next }).eq('id', userId);
+    setFailed(false);
+    const { error } = await createClient().from('profiles').update({ daily_goal: next }).eq('id', userId);
     setSaving(false);
+    if (error) {
+      setValue(prev);
+      setFailed(true);
+      return;
+    }
+    // Xoá bản cũ trong bộ nhớ để quay lại màn luyện là vòng tròn dùng mục tiêu mới ngay
+    router.refresh();
   }
 
   return (
@@ -34,7 +46,11 @@ export default function GoalPicker({ userId, goal }: { userId: string; goal: num
         ))}
       </div>
       <p className="mt-2 text-xs leading-relaxed text-muted">
-        {saving ? 'Đang lưu…' : 'Mục tiêu mỗi ngày. Vòng tròn ở màn hình luyện đếm theo con số này.'}
+        {saving
+          ? 'Đang lưu…'
+          : failed
+            ? 'Chưa lưu được, kiểm tra mạng rồi chọn lại nhé.'
+            : 'Mục tiêu mỗi ngày. Vòng tròn ở màn hình luyện đếm theo con số này.'}
       </p>
     </div>
   );

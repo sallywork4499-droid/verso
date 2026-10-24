@@ -37,8 +37,12 @@ self.addEventListener('fetch', (e) => {
     e.respondWith(
       fetch(request)
         .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put(request, copy));
+          // Chỉ lưu trang tải thành công. Trang báo lỗi hay trang chuyển hướng (ví dụ sang
+          // đăng nhập) mà bị lưu thì lúc mất mạng app sẽ mở ra đúng trang lỗi đó.
+          if (res.ok && !res.redirected && res.type === 'basic') {
+            const copy = res.clone();
+            caches.open(CACHE).then((c) => c.put(request, copy));
+          }
           return res;
         })
         .catch(() => caches.match(request).then((r) => r ?? caches.match('/')))

@@ -7,7 +7,7 @@ import GoalPicker from '@/components/GoalPicker';
 import WeakCards from '@/components/WeakCards';
 import type { Card } from '@/lib/types';
 import { badgeLabel, POINT_BADGES, STREAK_BADGES } from '@/lib/scoring';
-import { dateKey } from '@/lib/session';
+import { dateKey, daysBefore, displayStreak } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,17 +48,21 @@ export default async function Dashboard() {
   const tz = profile?.timezone ?? 'Asia/Ho_Chi_Minh';
   const today = dateKey(new Date(), tz);
   const todayLog = logs?.find((l) => l.log_date === today);
-  const week = (logs ?? []).slice(0, 7);
+  // Bảy ngày theo lịch (hôm nay và sáu ngày trước), không phải bảy dòng có học gần nhất
+  const weekStart = daysBefore(today, 6);
+  const week = (logs ?? []).filter((l) => l.log_date >= weekStart);
   const weekMinutes = Math.round(week.reduce((s, l) => s + l.seconds_spent, 0) / 60);
   const totalCards = (logs ?? []).reduce((s, l) => s + l.cards_completed, 0);
 
   const earned = Array.from(new Set((badges ?? []).map((b) => b.badge_key)));
   const points = profile?.total_points ?? 0;
   const nextPointBadge = POINT_BADGES.find((m) => points < m);
-  const nextStreakBadge = STREAK_BADGES.find((m) => (profile?.current_streak ?? 0) < m);
+  // Bỏ lỡ một ngày thì hiện 0 ngay (chỉ đổi cách hiển thị, không ghi gì vào database)
+  const streak = displayStreak(profile?.current_streak ?? 0, profile?.last_active_date ?? null, today);
+  const nextStreakBadge = STREAK_BADGES.find((m) => streak < m);
 
   return (
-    <main className="mx-auto min-h-[100dvh] max-w-2xl px-4 pb-16 pt-4">
+    <main className="mx-auto min-h-[100dvh] max-w-2xl px-4 pb-[calc(4rem+env(safe-area-inset-bottom))] pt-[calc(1rem+env(safe-area-inset-top))]">
       <div className="flex items-center justify-between">
         <Link href="/" className="text-sm text-muted hover:text-ink">
           ← Luyện dịch
@@ -70,7 +74,7 @@ export default async function Dashboard() {
 
       <section className="mt-8">
         <p className="text-5xl font-bold text-brand">
-          {profile?.current_streak ?? 0}
+          {streak}
           <span className="ml-2 text-base text-muted">ngày liên tục</span>
         </p>
         <p className="mt-1 text-sm text-muted">
@@ -101,7 +105,7 @@ export default async function Dashboard() {
             Còn {(nextPointBadge - points).toLocaleString('vi-VN')} điểm tới mốc{' '}
             {nextPointBadge.toLocaleString('vi-VN')}.
             {nextStreakBadge &&
-              ` Còn ${nextStreakBadge - (profile?.current_streak ?? 0)} ngày tới mốc ${nextStreakBadge} ngày.`}
+              ` Còn ${nextStreakBadge - streak} ngày tới mốc ${nextStreakBadge} ngày.`}
           </p>
         )}
       </section>

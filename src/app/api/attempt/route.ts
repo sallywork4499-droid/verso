@@ -48,7 +48,7 @@ export async function POST(req: Request) {
     .eq('id', user.id)
     .single();
 
-  await supabase.from('attempts').insert({
+  const { error: insertErr } = await supabase.from('attempts').insert({
     card_id: cardId,
     user_id: user.id,
     user_answer: answer,
@@ -57,6 +57,11 @@ export async function POST(req: Request) {
     points_earned: points,
     llm_feedback: feedback ?? null,
   });
+  // Không ghi được bài làm thì dừng ở đây và báo lỗi, để app giữ câu lại cho bấm lần nữa.
+  // Trước v2.13 lỗi này bị bỏ qua và app vẫn chuyển câu như đã lưu.
+  if (insertErr) {
+    return NextResponse.json({ error: 'Chưa lưu được bài làm' }, { status: 500 });
+  }
 
   const newStreak = isCorrect ? card.streak + 1 : 0;
   await supabase

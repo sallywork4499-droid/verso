@@ -135,3 +135,36 @@ export function promptFont(text: string): { size: number; lineHeight: number } {
 
 /** Số dòng khởi điểm của ô nhập: bắt đầu nhỏ rồi tự cao dần theo lượng chữ. */
 export const ANSWER_MIN_ROWS = 2;
+
+/* ============================================================
+ * v2.13
+ * ============================================================ */
+
+/**
+ * Nạp lại lô mới khi màn hình đang hiện sẵn một câu (lấy từ bộ nhớ máy lúc mở app).
+ * Giữ nguyên câu đang hiện ở đầu để nó không tự đổi sang câu khác dưới mắt người dùng,
+ * rồi nối lô mới phía sau. Có bản mới hơn của chính câu đó từ server thì dùng bản mới.
+ */
+export function keepHead(current: readonly Card[], incoming: readonly Card[]): Card[] {
+  const head = current[0];
+  if (!head) return [...incoming];
+  const fresh = incoming.find((c) => c.id === head.id) ?? head;
+  return [fresh, ...incoming.filter((c) => c.id !== head.id)];
+}
+
+/** Lùi một ngày dạng YYYY-MM-DD đi n ngày, không phụ thuộc múi giờ của máy. */
+export function daysBefore(day: string, n: number): string {
+  const [y, m, d] = day.split('-').map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d - n));
+  return t.toISOString().slice(0, 10);
+}
+
+/**
+ * Streak để hiển thị. Database chỉ cập nhật streak khi có câu làm đúng,
+ * nên bỏ lỡ một ngày thì con số cũ vẫn nằm đó tới lần làm đúng kế tiếp.
+ * Hôm qua hoặc hôm nay có học thì streak còn; cũ hơn nữa là đã đứt.
+ */
+export function displayStreak(current: number, lastActive: string | null, today: string): number {
+  if (!lastActive || current <= 0) return 0;
+  return lastActive >= daysBefore(today, 1) ? current : 0;
+}

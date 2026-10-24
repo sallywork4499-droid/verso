@@ -37,17 +37,22 @@ export default function useViewportFit() {
       };
     }
 
+    // App mở từ biểu tượng trên màn hình chính của iPhone (chỉ iOS có navigator.standalone)
+    const iosStandalone = (navigator as Navigator & { standalone?: boolean }).standalone === true;
+
     let frame = 0;
     const apply = () => {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
-        const h = vv.height;
+        const raw = vv.height;
+        baseline.current = Math.max(baseline.current, raw);
+        // Bàn phím chiếm chỗ đáng kể mới tính là đang mở
+        const open = baseline.current > 0 && raw < baseline.current * 0.78;
+        const h = open ? raw : fullHeight(raw, iosStandalone);
         root.style.setProperty('--app-h', `${h}px`);
         root.style.setProperty('--app-top', `${vv.offsetTop}px`);
-        baseline.current = Math.max(baseline.current, h);
         setHeight(h);
-        // Bàn phím chiếm chỗ đáng kể mới tính là đang mở
-        setKeyboardOpen(baseline.current > 0 && h < baseline.current * 0.78);
+        setKeyboardOpen(open);
       });
     };
 
@@ -72,4 +77,24 @@ export default function useViewportFit() {
   }, []);
 
   return { height, keyboardOpen };
+}
+
+/**
+ * Chiều cao dùng khi bàn phím đóng.
+ *
+ * Trên iPhone đời mới (iOS 26, ví dụ iPhone 17 Pro), app mở từ màn hình chính
+ * được vẽ tràn lên dưới thanh trạng thái, nhưng visualViewport lại báo chiều cao
+ * đã trừ phần thanh trạng thái. Kết quả là khung app hụt một dải ở đáy.
+ * Khi đó app chiếm trọn màn hình, nên lấy luôn chiều cao màn hình.
+ */
+export function fullHeight(raw: number, iosStandalone: boolean): number {
+  if (!iosStandalone || typeof screen === 'undefined') return raw;
+  // iOS không đổi screen.width/height khi xoay máy, tự chọn cạnh theo hướng hiện tại
+  const portrait = window.innerHeight >= window.innerWidth;
+  const long = Math.max(screen.width, screen.height);
+  const short = Math.min(screen.width, screen.height);
+  const screenH = portrait ? long : short;
+  // Chỉ bù khi phần hụt cỡ một thanh trạng thái, tránh làm sai ở trường hợp lạ
+  const gap = screenH - raw;
+  return gap > 0 && gap <= 120 ? screenH : raw;
 }

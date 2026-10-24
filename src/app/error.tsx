@@ -15,7 +15,7 @@ export default function ErrorPage({
   }, [error]);
 
   return (
-    <main className="flex min-h-[100dvh] flex-col items-center justify-center gap-5 px-8 text-center">
+    <main className="flex min-h-[100dvh] flex-col items-center justify-center gap-5 px-8 pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] text-center">
       <h1 className="text-2xl font-bold">Có gì đó trục trặc</h1>
       <p className="max-w-xs leading-relaxed text-muted">
         Một phần của app vừa lỗi. Thử lại thường là xong.

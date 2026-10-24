@@ -120,11 +120,26 @@ export default function Ingest() {
 
   async function save() {
     setStep('saving');
+    setError(null);
+    try {
+      await saveRows();
+    } catch {
+      setError('Mất kết nối khi đang lưu. Thử lại nhé, chưa có gì bị ghi dở.');
+      setStep('review');
+    }
+  }
+
+  async function saveRows() {
     const supabase = createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) {
+      // Trước v2.13 nút kẹt ở "Đang lưu…" mãi
+      setError('Phiên đăng nhập đã hết. Đăng nhập lại rồi nạp lại nhé.');
+      setStep('review');
+      return;
+    }
 
     let pageId = target;
     if (target === 'new') {
@@ -139,6 +154,10 @@ export default function Ingest() {
         return;
       }
       pageId = page.id;
+      // Từ đây coi như lưu vào đoạn vừa tạo. Nếu bước dưới lỗi và người dùng bấm lưu lại,
+      // app lưu tiếp vào chính đoạn này: không tạo đoạn trùng, cũng không xoá gì.
+      setTarget(page.id);
+      setExisting((list) => [{ id: page.id, title: page.title, created_at: page.created_at }, ...list]);
     }
 
     const keep = rows.filter((r) => r.keep);
@@ -153,7 +172,8 @@ export default function Ingest() {
     );
 
     if (cardErr) {
-      setError('Không lưu được các câu');
+      // (v2.13.1) Không xoá gì. Đoạn vừa tạo được giữ lại và đã chọn sẵn để bấm lưu lại vào đó.
+      setError('Không lưu được các câu. Thử lại nhé.');
       setStep('review');
       return;
     }
@@ -174,7 +194,7 @@ export default function Ingest() {
   if (step === 'pick' || step === 'reading') {
     const busy = step === 'reading';
     return (
-      <main className="mx-auto min-h-[100dvh] max-w-md px-4 pb-16 pt-4">
+      <main className="mx-auto min-h-[100dvh] max-w-md px-4 pb-[calc(4rem+env(safe-area-inset-bottom))] pt-[calc(1rem+env(safe-area-inset-top))]">
         <Link href="/library" className="text-sm text-muted hover:text-ink">
           ← Thư viện
         </Link>
@@ -315,7 +335,7 @@ export default function Ingest() {
   const kept = rows.filter((r) => r.keep).length;
 
   return (
-    <main className="mx-auto min-h-[100dvh] max-w-2xl px-4 pb-32 pt-4">
+    <main className="mx-auto min-h-[100dvh] max-w-2xl px-4 pb-[calc(8rem+env(safe-area-inset-bottom))] pt-[calc(1rem+env(safe-area-inset-top))]">
       <h1 className="font-study text-3xl text-ink">Duyệt lại</h1>
       <p className="mt-2 text-sm leading-relaxed text-muted">
         Sửa chỗ nào lệch, bỏ chọn câu không cần. Câu trùng với thư viện đã được bỏ chọn sẵn.
@@ -447,7 +467,7 @@ export default function Ingest() {
         </span>
       </label>
 
-      <div className="fixed inset-x-0 bottom-0 border-t border-line bg-page/95 p-4 backdrop-blur">
+      <div className="fixed inset-x-0 bottom-0 border-t border-line bg-page/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur">
         <div className="mx-auto max-w-2xl">
           <button
             onClick={save}

@@ -70,7 +70,7 @@ export default function Login() {
   const ready = email.trim().length > 3 && password.length >= 6;
 
   return (
-    <main className="flex min-h-[100dvh] flex-col justify-center px-6 py-10">
+    <main className="flex min-h-[100dvh] flex-col justify-center px-6 pt-[calc(2.5rem+env(safe-area-inset-top))] pb-[calc(2.5rem+env(safe-area-inset-bottom))]">
       <div className="mx-auto w-full max-w-sm">
         <div className="pop flex justify-center">
           <Mascot size={124} />

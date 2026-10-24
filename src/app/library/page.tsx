@@ -26,7 +26,7 @@ export default async function Library() {
   }));
 
   return (
-    <main className="mx-auto min-h-[100dvh] max-w-2xl px-4 pb-16 pt-4">
+    <main className="mx-auto min-h-[100dvh] max-w-2xl px-4 pb-[calc(4rem+env(safe-area-inset-bottom))] pt-[calc(1rem+env(safe-area-inset-top))]">
       <header className="mb-6 flex items-center justify-between">
         <Link href="/" className="text-sm text-muted hover:text-ink">
           ← Luyện dịch
